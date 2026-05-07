@@ -1,25 +1,36 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
+
+// رفع ارور ایمپورت پی‌پال برای بیلد
 const paypal = require('@paypal/checkout-server-sdk');
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+// جلوگیری از کرش کردن استرایپ در زمان بیلد با چک کردن وجود کلید
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2024-04-16' as any,
 });
 
-// تنظیمات PayPal (حتما بعد از تست، به LiveEnvironment تغییر دهید)
-const environment = new paypal.core.SandboxEnvironment(
-  process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!,
-  process.env.PAYPAL_CLIENT_SECRET || '' // اگر سکرت پیپال را ندارید فعلا خالی بگذارید
-);
-const paypalClient = new paypal.core.PayPalHttpClient(environment);
+// تنظیمات PayPal - تغییر به LiveEnvironment برای استفاده واقعی روی دامنه
+// استفاده از شرط برای جلوگیری از ارور در زمان بیلد
+const getPaypalClient = () => {
+  const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '';
+  const clientSecret = process.env.PAYPAL_CLIENT_SECRET || '';
+  
+  // استفاده از LiveEnvironment چون روی دامنه اصلی هستید
+  // اگر هنوز در مرحله تست هستید، می‌توانید به SandboxEnvironment برگردانید
+  const environment = new paypal.core.LiveEnvironment(clientId, clientSecret);
+  return new paypal.core.PayPalHttpClient(environment);
+};
 
 export async function POST(req: Request) {
   try {
     const { amount, gateway, serviceName, link } = await req.json();
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.2xfollowers.com';
 
     // --- STRIPE ---
     if (gateway === 'stripe') {
+      if (!process.env.STRIPE_SECRET_KEY) {
+        throw new Error("Stripe Secret Key is missing");
+      }
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
         line_items: [{
@@ -33,12 +44,18 @@ export async function POST(req: Request) {
         mode: 'payment',
         success_url: `${siteUrl}/dashboard/orders?success=true`,
         cancel_url: `${siteUrl}/dashboard/new-order?canceled=true`,
+        // اضافه کردن متادیتا برای وب‌هوک و تلگرام
+        metadata: {
+          service_name: serviceName,
+          link: link
+        }
       });
       return NextResponse.json({ url: session.url });
     }
 
     // --- PAYPAL ---
     if (gateway === 'paypal') {
+      const paypalClient = getPaypalClient();
       const request = new paypal.orders.OrdersCreateRequest();
       request.requestBody({
         intent: 'CAPTURE',
@@ -56,7 +73,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ url: approveLink.href });
     }
 
-    // --- HESABPAY (اتصال مستقیم به API حساب‌پی) ---
+    // --- HESABPAY ---
     if (gateway === 'hesabpay') {
       const response = await fetch('https://api.hesab.com/v1/payment', {
         method: 'POST',
@@ -66,7 +83,7 @@ export async function POST(req: Request) {
         },
         body: JSON.stringify({
           amount: amount,
-          currency: 'AFN', // یا USD بسته به تنظیمات اکانت شما
+          currency: 'USD', 
           description: serviceName,
           callback_url: `${siteUrl}/api/webhooks/hesabpay`,
           return_url: `${siteUrl}/dashboard/orders`,
@@ -74,7 +91,6 @@ export async function POST(req: Request) {
       });
 
       const data = await response.json();
-      // فرض بر این است که HesabPay یک لینک پرداخت برمی‌گرداند
       return NextResponse.json({ url: data.payment_url || data.url });
     }
 
