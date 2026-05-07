@@ -6,9 +6,13 @@ export async function middleware(request: NextRequest) {
     request: { headers: request.headers },
   })
 
+  // جلوگیری از کرش در صورت نبود متغیرهای محیطی در زمان لوکال یا بیلد
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder';
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() { return request.cookies.getAll() },
@@ -22,24 +26,29 @@ export async function middleware(request: NextRequest) {
   )
 
   const { data: { session } } = await supabase.auth.getSession()
+  const path = request.nextUrl.pathname;
 
-  // 1. منطق جدید: اگر کاربر در ریشه سایت (/) است
-  if (request.nextUrl.pathname === '/') {
-    // اگر لاگین است برود دشبورد، اگر نیست برود لاگین
-    return NextResponse.redirect(new URL(session ? '/dashboard' : '/login', request.url))
+  // ۱. مسیرهای کاملاً عمومی (سرویس‌ها و محصولات برای همه باز باشد)
+  const isPublicPage = path === '/services' || path.startsWith('/products');
+  
+  // ۲. مسیرهای مربوط به ورود و ثبت نام
+  const isAuthPage = path === '/login' || path === '/signup';
+
+  // منطق درخواستی تو:
+  
+  // الف) اگر کاربر در صفحه اصلی (/) است
+  if (path === '/') {
+    return NextResponse.redirect(new URL('/services', request.url))
   }
 
-  // 2. تعریف مسیرهای عمومی (Public)
-  const publicRoutes = ['/login', '/signup'];
-  const isPublicRoute = publicRoutes.includes(request.nextUrl.pathname);
-
-  // 3. اگر کاربر لاگین نیست و در مسیرهای عمومی نیست -> هدایت به لاگین
-  if (!session && !isPublicRoute) {
+  // ب) اگر کاربر لاگین نیست و می‌خواهد به بخش‌های خصوصی (مثل دشبورد یا ثبت سفارش) برود
+  // ما اینجا فرض می‌کنیم هر مسیری غیر از سرویس‌ها و لاگین، نیاز به ورود دارد
+  if (!session && !isPublicPage && !isAuthPage) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // 4. اگر کاربر لاگین است و می‌خواهد به مسیرهای عمومی برود (مثل لاگین مجدد) -> هدایت به دشبورد
-  if (session && isPublicRoute) {
+  // ج) اگر کاربر لاگین است و بیخودی به صفحه لاگین می‌رود
+  if (session && isAuthPage) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
