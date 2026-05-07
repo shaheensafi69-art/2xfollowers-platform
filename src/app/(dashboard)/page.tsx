@@ -1,4 +1,8 @@
+export const fetchCache = 'force-no-store';
+
 "use client";
+// بقیه کدها...
+// بقیه کدها...
 
 // این خط به نکس‌جی‌اس دستور می‌دهد که در زمان بیلد این صفحه را رندر نکند
 export const dynamic = 'force-dynamic';
