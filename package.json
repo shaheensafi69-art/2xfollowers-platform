@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
   "dev": "next dev",
-  "build": "next build", 
+  "build": "NEXT_PUBLIC_SUPABASE_URL=لینک_سوپابیس_تو NEXT_PUBLIC_SUPABASE_ANON_KEY=کلید_ناشناس_تو next build",
   "start": "next start",
-  "lint": "echo 'No linting needed'"
+  "lint": "next lint"
   },
   "dependencies": {
     "@paypal/checkout-server-sdk": "^1.0.3",
