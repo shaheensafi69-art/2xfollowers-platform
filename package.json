@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+  "build": "next build --no-lint",
   "dev": "next dev",
-  "build": "NEXT_PUBLIC_SUPABASE_URL=لینک_سوپابیس_تو NEXT_PUBLIC_SUPABASE_ANON_KEY=کلید_ناشناس_تو next build",
   "start": "next start",
-  "lint": "next lint"
+  "lint": "next lint",
+  "test": "next test"
   },
   "dependencies": {
     "@paypal/checkout-server-sdk": "^1.0.3",

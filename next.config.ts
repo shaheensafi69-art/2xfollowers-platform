@@ -1,19 +1,7 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig & { eslint?: { ignoreDuringBuilds: boolean }; swcMinify?: boolean } = {
-  // نادیده گرفتن تمام خطاهای ESLint در زمان بیلد
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  // نادیده گرفتن تمام خطاهای تایپ‌اسکریپت در زمان بیلد
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  // تنظیمات اضافه برای پایداری
-  swcMinify: true,
-  images: {
-    unoptimized: true, // اگر ارور تصویر داری این کمک می‌کند
-  }
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  typescript: { ignoreBuildErrors: true },
+  eslint: { ignoreDuringBuilds: true },
 };
 
 export default nextConfig;
