@@ -1,11 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
+// تابع کمکی برای ارسال پیام به تلگرام
 async function sendTelegramMessage(text: string) {
   try {
     await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
@@ -23,19 +19,24 @@ async function sendTelegramMessage(text: string) {
 }
 
 export async function POST(req: Request) {
+  // تعریف سوپابیس در داخل تابع برای جلوگیری از ارور بیلد
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  );
+
   try {
     const body = await req.json();
     
-    // در HesabPay معمولاً استاتوس موفقیت در فیلد status یا نتیجه تراکنش است
+    // منطق بررسی تراکنش حساب‌پی
     if (body.status === 'success' || body.event === 'payment_success') {
-      const amount = body.amount; // مبلغ واریزی
-      const userPhone = body.user_phone; // یا هر فیلدی که برای شناسایی کاربر دارید
+      const amount = body.amount;
+      const userPhone = body.user_phone;
 
-      // ۱. پیدا کردن کاربر و شارژ ولت
       const { data: profile } = await supabase
         .from('profiles')
-        .select('id, balance, email')
-        .eq('phone', userPhone) // یا بر اساس ایمیل
+        .select('id, balance')
+        .eq('phone', userPhone)
         .single();
 
       if (profile) {
@@ -44,15 +45,14 @@ export async function POST(req: Request) {
           .update({ balance: profile.balance + amount })
           .eq('id', profile.id);
 
-        // ۲. ارسال پیام به تلگرام شما برای فروش در افغانستان
         const message = `
 🇦🇫 <b>واریز موفق از HesabPay!</b>
 ────────────────
-👤 <b>مشتری (موبایل):</b> ${userPhone}
+👤 <b>مشتری:</b> ${userPhone}
 💵 <b>مبلغ:</b> ${amount} AFN
-✅ <b>وضعیت:</b> ولت شارژ شد.
+✅ <b>وضعیت:</b> کیف پول شارژ شد.
 ────────────────
-@SafiInternational
+🌐 2xfollowers.com
         `;
         await sendTelegramMessage(message);
       }
