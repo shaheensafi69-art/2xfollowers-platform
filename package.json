@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
   "dev": "next dev",
-  "build": "NEXT_DISABLE_ESLINT=true next build",
+  "build": "NEXT_DISABLE_ESLINT=true NEXT_PUBLIC_SUPABASE_URL='https://your-project.supabase.co' NEXT_PUBLIC_SUPABASE_ANON_KEY='your-anon-key' next build",
   "start": "next start",
   "lint": "next lint",
   "test": "next test"

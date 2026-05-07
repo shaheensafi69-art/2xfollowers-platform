@@ -1,4 +1,8 @@
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+
 "use client";
+// بقیه کدها...
 import { createClient } from '@supabase/supabase-js';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
