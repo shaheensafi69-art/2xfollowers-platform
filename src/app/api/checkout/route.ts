@@ -1,36 +1,20 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
-// رفع ارور ایمپورت پی‌پال برای بیلد
+// استفاده از require برای جلوگیری از مشکلات تایپ در زمان بیلد
 const paypal = require('@paypal/checkout-server-sdk');
-
-// جلوگیری از کرش کردن استرایپ در زمان بیلد با چک کردن وجود کلید
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2024-04-16' as any,
-});
-
-// تنظیمات PayPal - تغییر به LiveEnvironment برای استفاده واقعی روی دامنه
-// استفاده از شرط برای جلوگیری از ارور در زمان بیلد
-const getPaypalClient = () => {
-  const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '';
-  const clientSecret = process.env.PAYPAL_CLIENT_SECRET || '';
-  
-  // استفاده از LiveEnvironment چون روی دامنه اصلی هستید
-  // اگر هنوز در مرحله تست هستید، می‌توانید به SandboxEnvironment برگردانید
-  const environment = new paypal.core.LiveEnvironment(clientId, clientSecret);
-  return new paypal.core.PayPalHttpClient(environment);
-};
 
 export async function POST(req: Request) {
   try {
     const { amount, gateway, serviceName, link } = await req.json();
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.2xfollowers.com';
 
-    // --- STRIPE ---
+    // --- STRIPE (تعریف در داخل تابع برای جلوگیری از ارور بیلد) ---
     if (gateway === 'stripe') {
-      if (!process.env.STRIPE_SECRET_KEY) {
-        throw new Error("Stripe Secret Key is missing");
-      }
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+        apiVersion: '2024-04-16' as any,
+      });
+
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
         line_items: [{
@@ -44,18 +28,19 @@ export async function POST(req: Request) {
         mode: 'payment',
         success_url: `${siteUrl}/dashboard/orders?success=true`,
         cancel_url: `${siteUrl}/dashboard/new-order?canceled=true`,
-        // اضافه کردن متادیتا برای وب‌هوک و تلگرام
-        metadata: {
-          service_name: serviceName,
-          link: link
-        }
+        metadata: { service_name: serviceName, link: link }
       });
       return NextResponse.json({ url: session.url });
     }
 
     // --- PAYPAL ---
     if (gateway === 'paypal') {
-      const paypalClient = getPaypalClient();
+      const environment = new paypal.core.LiveEnvironment(
+        process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '',
+        process.env.PAYPAL_CLIENT_SECRET || ''
+      );
+      const paypalClient = new paypal.core.PayPalHttpClient(environment);
+
       const request = new paypal.orders.OrdersCreateRequest();
       request.requestBody({
         intent: 'CAPTURE',
@@ -89,7 +74,6 @@ export async function POST(req: Request) {
           return_url: `${siteUrl}/dashboard/orders`,
         }),
       });
-
       const data = await response.json();
       return NextResponse.json({ url: data.payment_url || data.url });
     }
