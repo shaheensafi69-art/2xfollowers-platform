@@ -2,17 +2,17 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-// ... سایر ایمپورت‌ها
 export async function createClient() {
   const cookieStore = await cookies()
+
+  // اصلاح برای جلوگیری از ارور در زمان Build
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder';
+
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder',
+    supabaseUrl,
+    supabaseAnonKey,
     {
-       // ... بقیه کد کوکی‌ها
-    }
-  )
-}
       cookies: {
         getAll() {
           return cookieStore.getAll()
