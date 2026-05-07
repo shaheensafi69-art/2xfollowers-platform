@@ -29,11 +29,15 @@ export default function LoginPage() {
     <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-6 font-sans">
       <div className="w-full max-w-[450px]">
         <div className="text-center mb-10">
-          <div className="w-16 h-16 bg-emerald-600 rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg shadow-emerald-200">
-             <span className="text-white font-black text-2xl">V</span>
+          {/* بخش تایپوگرافی برند به جای لوگو */}
+          <div className="mb-4 inline-block">
+            <h1 className="text-5xl font-black tracking-tighter italic">
+              <span className="text-emerald-600">2X</span>
+              <span className="text-slate-900 ml-1">FOLLOWERS</span>
+            </h1>
+            <div className="h-1.5 w-12 bg-emerald-600 mx-auto mt-1 rounded-full"></div>
           </div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight uppercase">2X Followers</h1>
-          <p className="text-slate-500 mt-2 font-medium">Welcome back! Sign in to manage your growth.</p>
+          <p className="text-slate-500 mt-4 font-medium">Welcome back! Sign in to manage your growth.</p>
         </div>
 
         <div className="bg-white p-10 rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100">
@@ -44,7 +48,6 @@ export default function LoginPage() {
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 <input 
                   type="email" required placeholder="name@example.com"
-                  // کلاس text-slate-900 اضافه شد
                   className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-slate-900 focus:border-emerald-500 focus:bg-white outline-none transition-all"
                   onChange={(e) => setEmail(e.target.value)}
                 />
@@ -57,7 +60,6 @@ export default function LoginPage() {
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 <input 
                   type="password" required placeholder="••••••••"
-                  // کلاس text-slate-900 اضافه شد
                   className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-slate-900 focus:border-emerald-500 focus:bg-white outline-none transition-all"
                   onChange={(e) => setPassword(e.target.value)}
                 />

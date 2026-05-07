@@ -4,39 +4,39 @@ import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { 
   Instagram, Facebook, Youtube, Twitter, Music, MessageCircle, Bot, 
-  Video, ShieldCheck, BookOpen, FileText, Monitor, ShoppingCart, 
-  Gamepad2, Layers, Cpu, Zap, CreditCard, LayoutGrid, Loader2 
+  Video, ShieldCheck, BookOpen, FileText, Monitor, Layers, Cpu, Zap, 
+  LayoutGrid, Loader2, ArrowUpRight 
 } from 'lucide-react';
 
-// لیست کامل دسته‌بندی‌ها
-const PLATFORM_CONFIG: { [key: string]: { icon: any, color: string } } = {
-  'Instagram': { icon: Instagram, color: 'text-pink-600' },
-  'TikTok': { icon: Music, color: 'text-black' },
-  'CapCut': { icon: Video, color: 'text-cyan-500' },
-  'Adobe': { icon: Layers, color: 'text-red-700' },
-  'Linkedin': { icon: BookOpen, color: 'text-blue-700' },
-  'Telegram': { icon: MessageCircle, color: 'text-sky-500' },
-  'ChatGPT': { icon: Bot, color: 'text-emerald-600' },
-  'Claude': { icon: Bot, color: 'text-orange-500' },
-  'Grok': { icon: Cpu, color: 'text-gray-800' },
-  'Gemini': { icon: Bot, color: 'text-blue-400' },
-  'Perplexity': { icon: Zap, color: 'text-indigo-500' },
-  'Twitter': { icon: Twitter, color: 'text-sky-400' },
-  'Whatsapp': { icon: MessageCircle, color: 'text-green-500' },
-  'Midjourney': { icon: Video, color: 'text-purple-600' },
-  'NordVPN': { icon: ShieldCheck, color: 'text-red-500' },
-  'HMA': { icon: ShieldCheck, color: 'text-red-600' },
-  'ExpressVPN': { icon: ShieldCheck, color: 'text-red-500' },
-  'Facebook': { icon: Facebook, color: 'text-blue-600' },
-  'YouTube': { icon: Youtube, color: 'text-red-600' },
-  'ElevenLabs': { icon: Music, color: 'text-indigo-600' },
-  'Surfshark': { icon: ShieldCheck, color: 'text-teal-600' },
-  'HBO': { icon: Monitor, color: 'text-purple-500' },
-  'Udemy': { icon: BookOpen, color: 'text-orange-600' },
-  'Grammarly': { icon: FileText, color: 'text-green-500' },
-  'QuillBot': { icon: FileText, color: 'text-emerald-500' },
-  'Windows': { icon: Monitor, color: 'text-blue-500' },
-  'Microsoft': { icon: Monitor, color: 'text-blue-600' },
+// لیست کامل و دقیق ۲۷ دسته‌بندی با استایل اختصاصی
+const PLATFORM_CONFIG: { [key: string]: { icon: any, color: string, bg: string } } = {
+  'Instagram': { icon: Instagram, color: 'text-pink-600', bg: 'bg-pink-50' },
+  'TikTok': { icon: Music, color: 'text-slate-900', bg: 'bg-slate-100' },
+  'CapCut': { icon: Video, color: 'text-cyan-500', bg: 'bg-cyan-50' },
+  'Adobe': { icon: Layers, color: 'text-red-700', bg: 'bg-red-50' },
+  'Linkedin': { icon: BookOpen, color: 'text-blue-700', bg: 'bg-blue-50' },
+  'Telegram': { icon: MessageCircle, color: 'text-sky-500', bg: 'bg-sky-50' },
+  'ChatGPT': { icon: Bot, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+  'Claude': { icon: Bot, color: 'text-orange-500', bg: 'bg-orange-50' },
+  'Grok': { icon: Cpu, color: 'text-gray-800', bg: 'bg-gray-100' },
+  'Gemini': { icon: Bot, color: 'text-blue-400', bg: 'bg-blue-50' },
+  'Perplexity': { icon: Zap, color: 'text-indigo-500', bg: 'bg-indigo-50' },
+  'Twitter': { icon: Twitter, color: 'text-sky-400', bg: 'bg-sky-50' },
+  'Whatsapp': { icon: MessageCircle, color: 'text-green-500', bg: 'bg-green-50' },
+  'Midjourney': { icon: Video, color: 'text-purple-600', bg: 'bg-purple-50' },
+  'NordVPN': { icon: ShieldCheck, color: 'text-red-500', bg: 'bg-red-50' },
+  'HMA': { icon: ShieldCheck, color: 'text-red-600', bg: 'bg-red-50' },
+  'ExpressVPN': { icon: ShieldCheck, color: 'text-red-500', bg: 'bg-red-50' },
+  'Facebook': { icon: Facebook, color: 'text-blue-600', bg: 'bg-blue-50' },
+  'YouTube': { icon: Youtube, color: 'text-red-600', bg: 'bg-red-50' },
+  'ElevenLabs': { icon: Music, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+  'Surfshark': { icon: ShieldCheck, color: 'text-teal-600', bg: 'bg-teal-50' },
+  'HBO': { icon: Monitor, color: 'text-purple-500', bg: 'bg-purple-50' },
+  'Udemy': { icon: BookOpen, color: 'text-orange-600', bg: 'bg-orange-50' },
+  'Grammarly': { icon: FileText, color: 'text-green-500', bg: 'bg-green-50' },
+  'QuillBot': { icon: FileText, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+  'Windows': { icon: Monitor, color: 'text-blue-500', bg: 'bg-blue-50' },
+  'Microsoft': { icon: Monitor, color: 'text-blue-600', bg: 'bg-blue-50' },
 };
 
 export default function ServicesPage() {
@@ -50,7 +50,7 @@ export default function ServicesPage() {
   useEffect(() => {
     async function fetchServices() {
       setLoading(true);
-      const { data } = await supabase.from('smm_services').select('*');
+      const { data } = await supabase.from('smm_services').select('*').order('price', { ascending: true });
       setServices(data || []);
       setFilteredServices(data || []);
       setLoading(false);
@@ -63,73 +63,114 @@ export default function ServicesPage() {
     if (platform === 'All') {
       setFilteredServices(services);
     } else {
-      // فیلتر کردن بر اساس کلمه کلیدی
-      setFilteredServices(services.filter(s => s.name.includes(platform)));
+      setFilteredServices(services.filter(s => s.name.toLowerCase().includes(platform.toLowerCase())));
     }
   };
 
   return (
-    <div className="space-y-8">
-      <h2 className="text-3xl font-black text-slate-900">Services</h2>
+    <div className="max-w-7xl mx-auto px-4 py-8 space-y-12">
+      <div className="flex flex-col gap-2">
+        <h2 className="text-4xl font-black text-slate-900 tracking-tight italic uppercase">
+          <span className="text-emerald-600">2X</span> Premium Services
+        </h2>
+        <p className="text-slate-500 font-medium text-lg px-1">Discover high-quality growth solutions for 27+ platforms.</p>
+      </div>
 
-      {/* لیست دسته‌بندی‌ها با قابلیت Wrap برای نمایش بهتر در موبایل و دسکتاپ */}
-      <div className="flex flex-wrap gap-2">
+      {/* بخش کتگوری‌ها به صورت گرید اکسلی منظم */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-px bg-slate-200 border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
         <button 
           onClick={() => filterServices('All')}
-          className={`px-4 py-2 rounded-xl border-2 font-bold transition-all ${
-            activeTab === 'All' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-100 bg-white'
+          className={`flex flex-col items-center justify-center p-6 gap-3 transition-all ${
+            activeTab === 'All' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
           }`}
         >
-          All
+          <LayoutGrid size={24} />
+          <span className="font-black text-[10px] uppercase tracking-widest text-center">All Services</span>
         </button>
 
         {Object.keys(PLATFORM_CONFIG).map((platform) => {
-          const { icon: Icon, color } = PLATFORM_CONFIG[platform];
+          const { icon: Icon, color, bg } = PLATFORM_CONFIG[platform];
+          const isActive = activeTab === platform;
           return (
             <button 
               key={platform}
               onClick={() => filterServices(platform)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 font-bold transition-all ${
-                activeTab === platform ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-100 bg-white'
+              className={`flex flex-col items-center justify-center p-5 gap-3 transition-all ${
+                isActive ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
               }`}
             >
-              <Icon size={18} className={activeTab === platform ? color : 'text-slate-400'} />
-              {platform}
+              <div className={`p-2.5 rounded-xl ${isActive ? 'bg-white/20' : bg}`}>
+                <Icon size={22} className={isActive ? 'text-white' : color} />
+              </div>
+              <span className="font-black text-[10px] uppercase tracking-widest text-center">{platform}</span>
             </button>
           );
         })}
       </div>
 
-      {/* جدول سرویس‌ها */}
-      <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
+      {/* بخش نمایش محصولات با آیکون داینامیک */}
+      <div className="space-y-6">
+        <div className="flex items-center justify-between px-2">
+          <h3 className="font-black text-slate-400 text-xs uppercase tracking-[0.3em]">Service Selection</h3>
+          <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-4 py-1.5 rounded-full border border-emerald-100 uppercase">
+            {filteredServices.length} active offers
+          </span>
+        </div>
+
         {loading ? (
-          <div className="p-12 text-center flex items-center justify-center gap-2"><Loader2 className="animate-spin" /> Loading...</div>
+          <div className="py-24 flex flex-col items-center justify-center gap-4 bg-white rounded-[3rem] border border-slate-100 shadow-sm">
+            <Loader2 className="animate-spin text-emerald-600" size={40} />
+            <p className="text-slate-400 font-black tracking-widest uppercase text-xs">Connecting to Secure Server...</p>
+          </div>
         ) : (
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-slate-50 text-slate-400 text-xs uppercase tracking-wider">
-                <th className="p-6">Service Name</th>
-                <th className="p-6">Price</th>
-                <th className="p-6 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredServices.map((s) => (
-                <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="p-6 font-medium text-slate-700">{s.name}</td>
-                  <td className="p-6 font-bold text-slate-900">${s.price}</td>
-                  <td className="p-6 text-right">
+          <div className="grid gap-4">
+            {filteredServices.map((s) => {
+              // پیدا کردن آیکون مناسب بر اساس نام محصول
+              const platformKey = Object.keys(PLATFORM_CONFIG).find(key => s.name.toLowerCase().includes(key.toLowerCase()));
+              const PlatformIcon = platformKey ? PLATFORM_CONFIG[platformKey].icon : Zap;
+              const platformColor = platformKey ? PLATFORM_CONFIG[platformKey].color : 'text-emerald-600';
+              const platformBg = platformKey ? PLATFORM_CONFIG[platformKey].bg : 'bg-emerald-50';
+
+              return (
+                <div 
+                  key={s.id} 
+                  className="group bg-white p-5 sm:p-7 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-emerald-50 hover:border-emerald-200 transition-all duration-500 flex flex-col sm:flex-row items-center justify-between gap-6"
+                >
+                  <div className="flex items-center gap-6 w-full">
+                    {/* نمایش آیکون پلتفرم داخل کارت */}
+                    <div className={`flex w-16 h-16 ${platformBg} rounded-[1.5rem] items-center justify-center ${platformColor} group-hover:scale-110 transition-transform duration-500`}>
+                      <PlatformIcon size={28} />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-lg font-black text-slate-800 group-hover:text-emerald-700 transition-colors uppercase italic tracking-tight leading-tight">
+                        {s.name}
+                      </h4>
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">Premium quality</span>
+                        <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">Fast delivery</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between sm:justify-end gap-10 w-full sm:w-auto border-t sm:border-t-0 pt-5 sm:pt-0">
+                    <div className="flex flex-col items-end">
+                      <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] mb-1">Price</span>
+                      <div className="flex items-baseline gap-1">
+                         <span className="text-3xl font-black text-slate-900 tracking-tighter">${s.price}</span>
+                      </div>
+                    </div>
                     <button 
                       onClick={() => router.push(`/dashboard/new-order?serviceId=${s.id}`)}
-                      className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-all"
+                      className="flex items-center gap-3 bg-slate-900 text-white px-10 py-5 rounded-2xl font-black hover:bg-emerald-600 transition-all shadow-xl active:scale-95 group/btn"
                     >
-                      Order
+                      ORDER 
+                      <ArrowUpRight size={20} className="group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1 transition-transform" />
                     </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>
