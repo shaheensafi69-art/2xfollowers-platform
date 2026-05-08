@@ -5,6 +5,7 @@ export async function POST(req: Request) {
     const { amount, userId } = await req.json();
     const apiKey = process.env.HESABPAY_API_KEY;
 
+    // ۱. ارسال درخواست
     const response = await fetch('https://api.hesabpay.com/api/v1/checkout/request', {
       method: 'POST',
       headers: {
@@ -12,21 +13,32 @@ export async function POST(req: Request) {
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
+        apiKey: apiKey,
         amount: amount,
         currency: "AFN",
-        description: `Charge Wallet - User: ${userId}`,
+        externalId: userId, // این خط بسیار حیاتی است! برای اینکه ویب‌هوک بفهمد پول مال کیست
+        description: `Wallet Top-up for user ${userId}`,
         callbackUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/api/webhooks/hesabpay`,
       }),
     });
 
-    const data = await response.json();
+    // ۲. خواندن متن خام پاسخ برای عیب‌یابی
+    const responseText = await response.text();
+    console.log("Raw Response from HesabPay:", responseText);
 
-    if (data.url || data.payment_url) {
-      return NextResponse.json({ url: data.url || data.payment_url });
-    } else {
-      return NextResponse.json({ error: data.message || "HesabPay Error" }, { status: 400 });
+    try {
+      const data = JSON.parse(responseText);
+      if (data.url || data.payment_url) {
+        return NextResponse.json({ url: data.url || data.payment_url });
+      } else {
+        return NextResponse.json({ error: data.message || "خطا در پاسخ حساب‌پی" }, { status: 400 });
+      }
+    } catch (e) {
+      return NextResponse.json({ error: "پاسخ سرور حساب‌پی معتبر نیست (JSON error)" }, { status: 500 });
     }
+
   } catch (err: any) {
-    return NextResponse.json({ error: "Connection to HesabPay failed" }, { status: 500 });
+    console.error("Connection Error:", err.message);
+    return NextResponse.json({ error: "ارتباط با سرور حساب‌پی برقرار نشد" }, { status: 500 });
   }
 }
