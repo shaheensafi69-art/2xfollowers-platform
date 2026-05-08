@@ -40,8 +40,8 @@ const PLATFORM_UI: { [key: string]: { icon: any, color: string, bg: string } } =
 
 const PAYMENT_GATEWAYS = [
   { id: 'stripe', name: 'Credit Card', icon: CreditCard, color: 'bg-indigo-600', status: 'active' },
+  { id: 'crypto', name: 'Crypto', icon: Coins, color: 'bg-orange-500', status: 'active' }, // فعال شد
   { id: 'hesabpay', name: 'HesabPay', icon: ShieldCheck, color: 'bg-emerald-600', status: 'soon' },
-  { id: 'crypto', name: 'Crypto', icon: Coins, color: 'bg-orange-500', status: 'soon' },
   { id: 'paypal', name: 'PayPal', icon: Globe, color: 'bg-blue-500', status: 'soon' },
 ];
 
@@ -49,6 +49,7 @@ const CATEGORY_MAP = Object.keys(PLATFORM_UI);
 
 export default function NewOrderPage() {
   const supabase = createClient();
+  const router = useRouter();
   const [allServices, setAllServices] = useState<any[]>([]);
   const [filteredServices, setFilteredServices] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -88,7 +89,7 @@ export default function NewOrderPage() {
 
   const handlePayment = async (gatewayId: string, status: string) => {
     if (status === 'soon') {
-      alert("این روش پرداخت به زودی فعال خواهد شد. فعلاً از استرایپ استفاده کنید.");
+      alert("این روش پرداخت به زودی فعال خواهد شد.");
       return;
     }
 
@@ -141,7 +142,6 @@ export default function NewOrderPage() {
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
         <div className="lg:col-span-3 bg-white p-6 sm:p-10 rounded-[3rem] border border-slate-100 shadow-xl space-y-8">
           
-          {/* Step 1: Select Platform */}
           <div className="space-y-3 relative">
             <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">1. Select Platform</label>
             <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="w-full p-5 bg-slate-50 rounded-2xl border-2 border-transparent hover:border-emerald-200 transition-all flex items-center justify-between group">
@@ -173,7 +173,6 @@ export default function NewOrderPage() {
             )}
           </div>
 
-          {/* Step 2: Service Selector */}
           <div className="space-y-3">
             <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">2. Service Type</label>
             <select disabled={!selectedCategory} className="w-full p-5 bg-slate-50 rounded-2xl border-2 border-transparent focus:border-emerald-500 outline-none font-bold text-slate-700 disabled:opacity-30" value={selectedService?.id || ""} onChange={(e) => setSelectedService(filteredServices.find(s => String(s.id) === String(e.target.value)))}>
@@ -182,7 +181,6 @@ export default function NewOrderPage() {
             </select>
           </div>
 
-          {/* Step 3: Link */}
           <div className="space-y-3">
             <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">3. Destination Link</label>
             <div className="relative">
@@ -191,13 +189,11 @@ export default function NewOrderPage() {
             </div>
           </div>
 
-          {/* Step 4: Quantity */}
           <div className="space-y-3">
             <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">4. Quantity</label>
             <input type="number" value={quantity} disabled={isFixedProduct} className={`w-full p-5 rounded-2xl border-2 border-transparent outline-none font-black text-xl ${isFixedProduct ? 'bg-slate-100 text-slate-400' : 'bg-slate-50 focus:border-emerald-500'}`} onChange={(e) => setQuantity(Number(e.target.value))} />
           </div>
 
-          {/* Payment Gateways Section */}
           {!showGateways ? (
             <button 
               onClick={() => (selectedService && link) ? setShowGateways(true) : alert("لطفاً فرم را تکمیل کنید.")}
@@ -227,7 +223,6 @@ export default function NewOrderPage() {
           )}
         </div>
 
-        {/* Sidebar Summary */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-slate-900 text-white p-8 rounded-[3rem] shadow-2xl sticky top-28 border border-white/5 overflow-hidden">
             <div className="mb-8 p-5 bg-white/5 rounded-[2rem] border border-white/10 flex items-center justify-between">
