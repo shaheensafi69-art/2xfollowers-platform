@@ -2,31 +2,65 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
-export async function POST(req: Request) {
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2023-10-16' as any });
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { 
+  apiVersion: '2025-01-27' as any 
+});
 
+export async function POST(req: Request) {
   const payload = await req.text();
   const sig = req.headers.get('stripe-signature')!;
+  
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
 
   try {
     const event = stripe.webhooks.constructEvent(payload, sig, process.env.STRIPE_WEBHOOK_SECRET!);
 
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as Stripe.Checkout.Session;
-      const userId = session.metadata?.userId;
-      const amount = session.amount_total ? session.amount_total / 100 : 0;
+      const metadata = session.metadata;
 
-      if (userId) {
-        // آپدیت موجودی با تابعی که قبلاً در دیتابیس ساختیم
-        await supabase.rpc('increment_balance', { 
-          user_id: userId, 
-          amount_to_add: amount 
+      // بررسی وجود اطلاعات ضروری در متادیتا
+      if (metadata && metadata.serviceId && metadata.link && metadata.quantity) {
+        
+        // ۱. آماده‌سازی دیتا برای FameGrows
+        const formData = new URLSearchParams();
+        formData.append('key', '91eebf77733dcda06d6839fa4a4c9b2b');
+        formData.append('action', 'add');
+        formData.append('service', metadata.serviceId); // استرایپ خودش استرینگ می‌دهد
+        formData.append('link', metadata.link);
+        formData.append('quantity', metadata.quantity);
+
+        // ۲. ارسال به تامین‌کننده
+        const supplierResponse = await fetch('https://famegrows.com/api/v2', {
+          method: 'POST',
+          body: formData,
         });
+
+        const result = await supplierResponse.json();
+
+        // ۳. ثبت در سوپابیس (با تبدیل دستی انواع داده برای جلوگیری از ارور)
+        const { error: dbError } = await supabase.from('smm_orders').insert({
+          user_id: parseInt(metadata.userId), 
+          service_id: parseInt(metadata.serviceId),
+          link: metadata.link,
+          quantity: parseInt(metadata.quantity || '100'),
+          total_cost: session.amount_total ? session.amount_total / 100 : 0, // تغییر به total_cost
+          status: result.order ? 'processing' : 'error',
+          supplier_order_id: result.order ? String(result.order) : null // تغییر به supplier_order_id
+        });
+
+        if (dbError) {
+          console.error("Supabase Database Error:", dbError.message);
+        }
       }
     }
+
     return NextResponse.json({ received: true });
   } catch (err: any) {
+    console.error("Webhook Protection Error:", err.message);
     return NextResponse.json({ error: err.message }, { status: 400 });
   }
 }
