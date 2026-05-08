@@ -7,7 +7,7 @@ export async function POST(req: Request) {
 
     if (!apiKey) return NextResponse.json({ error: "HesabPay Key missing" }, { status: 500 });
 
-    const response = await fetch('https://api.hesabpay.af/api/v1/checkout/request', {
+    const response = await fetch('https://api.hesabpay.com/api/v1/checkout/request', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

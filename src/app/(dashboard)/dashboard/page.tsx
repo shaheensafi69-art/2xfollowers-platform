@@ -22,11 +22,11 @@ export default function DashboardPage() {
     if (!user) return;
 
     const { data: profile } = await supabase.from('profiles').select('balance').eq('id', user.id).single();
-    const { count: ordersCount } = await supabase.from('orders').select('*', { count: 'exact', head: true }).eq('user_id', user.id);
-    const { count: pendingCount } = await supabase.from('orders').select('*', { count: 'exact', head: true }).eq('user_id', user.id).in('status', ['pending', 'processing']);
+    const { count: ordersCount } = await supabase.from('smm_orders').select('*', { count: 'exact', head: true }).eq('user_id', user.id);
+    const { count: pendingCount } = await supabase.from('smm_orders').select('*', { count: 'exact', head: true }).eq('user_id', user.id).in('status', ['pending', 'processing']);
 
     const { data: latestOrders } = await supabase
-      .from('orders')
+      .from('smm_orders')
       .select(`id, created_at, status, total_charge, smm_services (name)`)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })

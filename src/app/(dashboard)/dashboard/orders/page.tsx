@@ -13,7 +13,7 @@ export default function OrdersPage() {
       setLoading(true);
       // دریافت سفارش‌ها و جوین کردن با جدول سرویس‌ها برای نمایش نام سرویس
       const { data, error } = await supabase
-        .from('orders')
+        .from('smm_orders')
         .select(`
           *,
           smm_services (
