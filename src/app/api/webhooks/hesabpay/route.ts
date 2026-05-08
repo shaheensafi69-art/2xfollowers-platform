@@ -1,99 +1,48 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-/**
- * تابع کمکی برای ارسال اعلان به تلگرام شاهین صافی
- */
-async function sendTelegramMessage(text: string) {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-
-  if (!botToken || !chatId) {
-    console.error("Telegram credentials missing in environment variables.");
-    return;
-  }
-
-  try {
-    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        chat_id: chatId, 
-        text: text, 
-        parse_mode: 'HTML' 
-      }),
-    });
-  } catch (err) {
-    console.error("Telegram Notification Error:", err);
-  }
-}
 
 export async function POST(req: Request) {
-  /**
-   * تعریف سوپابیس در داخل تابع POST:
-   * این کار حیاتی است تا در زمان بیلد ورسل، به دلیل نبود متغیرهای محیطی، پروسه متوقف نشود.
-   */
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
-    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-  );
-
   try {
-    const body = await req.json();
-    
-    /**
-     * منطق بررسی تراکنش حساب‌پی
-     * طبق داکیومنت HesabPay، وضعیت تراکنش در بدنه درخواست ارسال می‌شود.
-     */
-    if (body.status === 'success' || body.event === 'payment_success' || body.state === 'COMPLETED') {
-      const amount = Number(body.amount); // مبلغ واریزی
-      const userPhone = body.user_phone || body.phone; // شماره موبایل پرداخت‌کننده
+    const { amount, userId } = await req.json();
 
-      // ۱. پیدا کردن پروفایل کاربر بر اساس شماره موبایل در دیتابیس سوپابیس
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, balance, full_name')
-        .eq('phone', userPhone)
-        .single();
-
-      if (profileError) {
-        console.error("User not found or database error:", profileError);
-        return NextResponse.json({ error: "User not found" }, { status: 404 });
-      }
-
-      if (profile) {
-        // ۲. آپدیت موجودی کیف پول کاربر
-        const newBalance = (profile.balance || 0) + amount;
-        
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({ balance: newBalance })
-          .eq('id', profile.id);
-
-        if (updateError) {
-          console.error("Failed to update balance:", updateError);
-          return NextResponse.json({ error: "Update failed" }, { status: 500 });
-        }
-
-        // ۳. ارسال پیام تاییدیه به تلگرام مدیریت
-        const message = `
-🇦🇫 <b>واریز موفق از HesabPay!</b>
-────────────────
-👤 <b>مشتری:</b> ${profile.full_name || 'کاربر سیستم'}
-📱 <b>شماره موبایل:</b> ${userPhone}
-💵 <b>مبلغ شارژ:</b> ${amount} AFN
-💰 <b>موجودی جدید:</b> ${newBalance} AFN
-✅ <b>وضعیت:</b> کیف پول با موفقیت شارژ شد.
-────────────────
-🌐 <b>2xfollowers.com</b>
-        `;
-        await sendTelegramMessage(message);
-      }
+    // ۱. بررسی وجود کلید در تنظیمات ورسل
+    const apiKey = process.env.HESABPAY_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({ error: "API Key is missing in server settings" }, { status: 500 });
     }
 
-    return NextResponse.json({ received: true, status: 'success' });
+    // ۲. درخواست لینک پرداخت از حساب‌پی
+    const response = await fetch('https://api.hesabpay.af/api/v1/checkout/request', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        // در این حالت، کلید شما هم نقش شناسایی و هم نقش امنیت را دارد
+        'Authorization': `Bearer ${apiKey}` 
+      },
+      body: JSON.stringify({
+  amount: amount,
+  currency: "AFN",
+  description: `Wallet recharge for user: ${userId}`,
+  callbackUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/api/webhooks/hesabpay`, // آدرس وب‌هوک
+  metadata: { userId: userId } // بسیار مهم برای شارژ خودکار ولت
+}),
+    });
+
+    const data = await response.json();
+
+    // ۳. لاگ گرفتن برای عیب‌یابی (فقط در کنسول سرور دیده می‌شود)
+    console.log("HesabPay API Response:", data);
+
+    if (data.url || data.payment_url) {
+      return NextResponse.json({ url: data.url || data.payment_url });
+    } else {
+      // اگر حساب‌پی ارور بدهد، پیغام دقیقش را برمی‌گردانیم
+      return NextResponse.json({ 
+        error: data.message || "HesabPay error: Please check your API Key permissions." 
+      }, { status: 400 });
+    }
+
   } catch (err: any) {
-    console.error("HesabPay Webhook Error:", err.message);
-    return NextResponse.json({ error: 'Webhook processing failed' }, { status: 400 });
+    console.error("Connection Error:", err.message);
+    return NextResponse.json({ error: "Failed to connect to HesabPay server" }, { status: 500 });
   }
 }

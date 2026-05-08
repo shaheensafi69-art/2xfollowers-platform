@@ -76,27 +76,30 @@ export default function AddFundsPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
+      if (!user) {
+        alert("Please login first");
+        return;
+      }
+
       const response = await fetch(`/api/checkout/${selectedGateway}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amount: Number(amount),
-          userId: user?.id,
-          // این بخش برای جلوگیری از ارور Stripe اضافه شد:
-          productName: "Wallet Top-up", 
-          currency: selectedGateway === 'hesabpay' ? 'AFN' : 'USD',
-          rate: liveRate
+          userId: user.id, // فرستادن آی‌دی کاربر برای شارژ درست حساب
         }),
       });
 
       const data = await response.json();
+      
       if (data.url) {
-        window.location.href = data.url;
+        window.location.href = data.url; // ریدایرکت به صفحه پرداخت
       } else {
-        alert("Error: " + (data.error || "Payment generation failed"));
+        console.error("Gateway Error:", data.error);
+        alert("Gateway Error: " + (data.error || "Check console for details"));
       }
     } catch (err) {
-      alert("System connection error. Please try again.");
+      alert("Connection failed. Check your internet or API routes.");
     } finally {
       setLoading(false);
     }
