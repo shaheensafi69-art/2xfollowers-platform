@@ -67,43 +67,33 @@ export default function AddFundsPage() {
     : Number(amount);
 
   const handleDeposit = async () => {
-    if (!amount || Number(amount) <= 0) {
-      alert("Please enter a valid amount");
-      return;
-    }
+  if (!amount || Number(amount) <= 0) return alert("Enter amount");
+  
+  setLoading(true);
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
     
-    setLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        alert("Please login first");
-        return;
-      }
+    const response = await fetch(`/api/checkout/${selectedGateway}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount: Number(amount),
+        userId: user?.id
+      }),
+    });
 
-      const response = await fetch(`/api/checkout/${selectedGateway}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: Number(amount),
-          userId: user.id, // فرستادن آی‌دی کاربر برای شارژ درست حساب
-        }),
-      });
-
-      const data = await response.json();
-      
-      if (data.url) {
-        window.location.href = data.url; // ریدایرکت به صفحه پرداخت
-      } else {
-        console.error("Gateway Error:", data.error);
-        alert("Gateway Error: " + (data.error || "Check console for details"));
-      }
-    } catch (err) {
-      alert("Connection failed. Check your internet or API routes.");
-    } finally {
-      setLoading(false);
+    const data = await response.json();
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      alert("Gateway Error: " + data.error);
     }
-  };
+  } catch (err) {
+    alert("Connection Failed. Check your internet/VPN.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="max-w-6xl mx-auto space-y-10 pb-20 animate-in fade-in duration-700 px-4">
