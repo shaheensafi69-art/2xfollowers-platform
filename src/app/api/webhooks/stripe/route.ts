@@ -22,41 +22,49 @@ export async function POST(req: Request) {
       const session = event.data.object as Stripe.Checkout.Session;
       const metadata = session.metadata;
 
-      // بررسی وجود اطلاعات ضروری در متادیتا
-      if (metadata && metadata.serviceId && metadata.link && metadata.quantity) {
-        
-        // ۱. آماده‌سازی دیتا برای FameGrows
-        const formData = new URLSearchParams();
-        formData.append('key', '91eebf77733dcda06d6839fa4a4c9b2b');
-        formData.append('action', 'add');
-        formData.append('service', metadata.serviceId); // استرایپ خودش استرینگ می‌دهد
-        formData.append('link', metadata.link);
-        formData.append('quantity', metadata.quantity);
+      // ۱. استخراج اطلاعات با مقادیر پیش‌فرض (حتی اگر در متادیتا نباشند)
+      const userId = metadata?.userId || "Guest_User";
+      const serviceId = metadata?.serviceId || "0";
+      const link = metadata?.link || "No Link in Metadata";
+      const quantity = metadata?.quantity || "0";
 
-        // ۲. ارسال به تامین‌کننده
-        const supplierResponse = await fetch('https://famegrows.com/api/v2', {
-          method: 'POST',
-          body: formData,
-        });
+      let supplierOrderId = null;
 
-        const result = await supplierResponse.json();
+      // ۲. تلاش برای ارسال به FameGrows (فقط اگر اطلاعات کامل باشد)
+      if (metadata?.serviceId && metadata?.link) {
+        try {
+          const formData = new URLSearchParams();
+          formData.append('key', '91eebf77733dcda06d6839fa4a4c9b2b');
+          formData.append('action', 'add');
+          formData.append('service', serviceId);
+          formData.append('link', link);
+          formData.append('quantity', quantity);
 
-        // ۳. ثبت در سوپابیس (با تبدیل دستی انواع داده برای جلوگیری از ارور)
-        // بخش ثبت در سوپابیس در فایل stripe webhook
-const { error: dbError } = await supabase.from('smm_orders').insert({
-  // در فایل ویب‌هوک این خط را اصلاح کن:
-user_id: metadata.userId, // مستقیم بفرست، چون هر دو متن هستند 
-  service_id: parseInt(metadata.serviceId),
-  link: metadata.link,
-  quantity: parseInt(metadata.quantity || '100'),
-  total_cost: session.amount_total ? session.amount_total / 100 : 0, 
-  status: result.order ? 'processing' : 'error',
-  supplier_order_id: result.order ? String(result.order) : null 
-});
-
-        if (dbError) {
-          console.error("Supabase Database Error:", dbError.message);
+          const supplierResponse = await fetch('https://famegrows.com/api/v2', {
+            method: 'POST',
+            body: formData,
+          });
+          const result = await supplierResponse.json();
+          supplierOrderId = result.order ? String(result.order) : null;
+        } catch (fameError) {
+          console.error("FameGrows Error:", fameError);
         }
+      }
+
+      // ۳. ثبت قطعی در سوپابیس (حتی با دیتای ناقص برای دیباگ)
+      const { error: dbError } = await supabase.from('smm_orders').insert({
+        user_id: userId, 
+        service_id: parseInt(serviceId) || 0,
+        link: link,
+        quantity: parseInt(quantity) || 0,
+        total_cost: session.amount_total ? session.amount_total / 100 : 0, 
+        status: supplierOrderId ? 'processing' : 'pending_metadata',
+        supplier_order_id: supplierOrderId
+      });
+
+      if (dbError) {
+        console.error("Supabase Insertion Error:", dbError.message);
+        // اگر اینجا ارور بدهد، در لاگ ورسل چاپ می‌شود
       }
     }
 
