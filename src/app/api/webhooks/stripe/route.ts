@@ -42,15 +42,16 @@ export async function POST(req: Request) {
         const result = await supplierResponse.json();
 
         // ۳. ثبت در سوپابیس (با تبدیل دستی انواع داده برای جلوگیری از ارور)
-        const { error: dbError } = await supabase.from('smm_orders').insert({
-          user_id: parseInt(metadata.userId), 
-          service_id: parseInt(metadata.serviceId),
-          link: metadata.link,
-          quantity: parseInt(metadata.quantity || '100'),
-          total_cost: session.amount_total ? session.amount_total / 100 : 0, // تغییر به total_cost
-          status: result.order ? 'processing' : 'error',
-          supplier_order_id: result.order ? String(result.order) : null // تغییر به supplier_order_id
-        });
+        // بخش ثبت در سوپابیس در فایل stripe webhook
+const { error: dbError } = await supabase.from('smm_orders').insert({
+  user_id: metadata.userId ? parseInt(metadata.userId) : null, 
+  service_id: parseInt(metadata.serviceId),
+  link: metadata.link,
+  quantity: parseInt(metadata.quantity || '100'),
+  total_cost: session.amount_total ? session.amount_total / 100 : 0, 
+  status: result.order ? 'processing' : 'error',
+  supplier_order_id: result.order ? String(result.order) : null 
+});
 
         if (dbError) {
           console.error("Supabase Database Error:", dbError.message);

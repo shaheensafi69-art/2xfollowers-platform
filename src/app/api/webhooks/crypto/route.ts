@@ -33,12 +33,13 @@ export async function POST(req: Request) {
         process.env.SUPABASE_SERVICE_ROLE_KEY!
       );
 
-      await supabase.from('smm_orders').insert({
-  user_id: userId && userId !== '0' ? parseInt(userId) : null, // اگر آیدی نبود، نال بفرستد
+    // بخش ثبت در سوپابیس در فایل crypto webhook
+await supabase.from('smm_orders').insert({
+  user_id: userId && userId !== '0' ? parseInt(userId) : null,
   service_id: parseInt(serviceId),
   link: link,
   quantity: parseInt(quantity),
-  total_cost: parseFloat(body.actually_paid || body.price_amount || 0), // تبدیل به عدد اعشاری
+  total_cost: parseFloat(body.actually_paid || body.price_amount || '0'), 
   status: result.order ? 'processing' : 'error',
   supplier_order_id: result.order ? String(result.order) : null
 });
