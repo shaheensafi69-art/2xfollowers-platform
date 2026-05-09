@@ -7,10 +7,9 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 export async function POST(req: Request) {
   try {
-    // دریافت اطلاعات کامل سفارش از سمت کلاینت
+    // دریافت تمام متغیرهای لازم از فرانت‌اند
     const { amount, userId, serviceId, link, quantity, serviceName } = await req.json();
 
-    // ایجاد جلسه پرداخت در استرایپ
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [{
@@ -26,8 +25,8 @@ export async function POST(req: Request) {
       }],
       mode: 'payment',
       
-      // بخش حیاتی: ارسال تمام اطلاعات به متادیتا
-      // چون یوزر آیدی را به متن تبدیل کردی، مستقیماً ذخیره می‌شود
+      // بخش کلیدی: ارسال دیتای کامل به ویب‌هوک
+      // چون user_id در دیتابیس Text شده، UUID بدون مشکل ذخیره می‌شود
       metadata: { 
         userId: String(userId), 
         serviceId: String(serviceId), 

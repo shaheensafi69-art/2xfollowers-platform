@@ -44,7 +44,8 @@ export async function POST(req: Request) {
         // ۳. ثبت در سوپابیس (با تبدیل دستی انواع داده برای جلوگیری از ارور)
         // بخش ثبت در سوپابیس در فایل stripe webhook
 const { error: dbError } = await supabase.from('smm_orders').insert({
-  user_id: metadata.userId ? parseInt(metadata.userId) : null, 
+  // در فایل ویب‌هوک این خط را اصلاح کن:
+user_id: metadata.userId, // مستقیم بفرست، چون هر دو متن هستند 
   service_id: parseInt(metadata.serviceId),
   link: metadata.link,
   quantity: parseInt(metadata.quantity || '100'),
