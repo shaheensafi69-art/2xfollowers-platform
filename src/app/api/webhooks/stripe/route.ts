@@ -22,26 +22,37 @@ export async function POST(req: Request) {
       const session = event.data.object as Stripe.Checkout.Session;
       const metadata = session.metadata;
 
-      // لاگ کردن برای عیب‌یابی در ورسل
-      console.log("🔔 Stripe Webhook Received for session:", session.id);
-      console.log("📦 Metadata found:", metadata);
+      console.log("🔔 Webhook Received. Session:", session.id);
 
-      // متغیرها را با امنیت استخراج می‌کنیم
-      const userId = metadata?.userId || 'f76c21e7-fbd9-4700-8fb0-2992a4bf1078'; // یوزر آیدی خودت به عنوان بک‌آپ
-      const serviceId = metadata?.serviceId || null;
+      // ۱. استخراج اطلاعات اولیه
+      const userId = metadata?.userId || 'f76c21e7-fbd9-4700-8fb0-2992a4bf1078';
+      const internalServiceId = metadata?.serviceId || '84'; // آیدی داخلی (مثلاً ۸۴)
       const link = metadata?.link || 'No Link Provided';
-      const quantity = metadata?.quantity || '10000';
+      const quantity = metadata?.quantity || '1000';
 
       let supplierOrderId = null;
+      let realSupplierId = null;
 
-      // فقط اگر اطلاعات سرویس کامل بود، به FameGrows بفرست
-      if (serviceId && metadata?.link) {
+      // ۲. پیدا کردن آیدی ۴ رقمی سپلایر از جدول smm_services
+      if (internalServiceId) {
+        const { data: serviceData } = await supabase
+          .from('smm_services')
+          .select('supplier_service_id')
+          .eq('id', parseInt(internalServiceId))
+          .single();
+        
+        realSupplierId = serviceData?.supplier_service_id;
+        console.log(`🔍 Internal ID ${internalServiceId} mapped to Supplier ID: ${realSupplierId}`);
+      }
+
+      // ۳. ارسال به FameGrows (فقط اگر آیدی سپلایر پیدا شد)
+      if (realSupplierId && metadata?.link) {
         try {
           const formData = new URLSearchParams();
           formData.append('key', '91eebf77733dcda06d6839fa4a4c9b2b'); 
           formData.append('action', 'add');
-          formData.append('service', serviceId);
-          formData.append('link', metadata.link);
+          formData.append('service', realSupplierId); // ارسال آیدی ۴ رقمی
+          formData.append('link', link);
           formData.append('quantity', quantity);
 
           const supplierResponse = await fetch('https://famegrows.com/api/v2', {
@@ -49,19 +60,22 @@ export async function POST(req: Request) {
             body: formData,
           });
           const result = await supplierResponse.json();
-          supplierOrderId = result.order ? String(result.order) : null;
-          console.log("✅ FameGrows Order Sent. ID:", supplierOrderId);
+          
+          if (result.order) {
+            supplierOrderId = String(result.order);
+            console.log("✅ FameGrows Success. Order ID:", supplierOrderId);
+          } else {
+            console.error("❌ FameGrows Rejected:", result);
+          }
         } catch (err) {
           console.error("❌ FameGrows API Error:", err);
         }
-      } else {
-        console.warn("⚠️ Metadata missing serviceId or link. Skipping FameGrows call.");
       }
 
-      // ثبت در دیتابیس تحت هر شرایطی (حتی با دیتای تستی یا ناقص)
+      // ۴. ثبت در دیتابیس (با آیدی داخلی ۸۴ برای حفظ ارتباط جداول)
       const { error: dbError } = await supabase.from('smm_orders').insert({
         user_id: userId, 
-        service_id: serviceId ? parseInt(serviceId) : 0,
+        service_id: parseInt(internalServiceId),
         link: link,
         quantity: parseInt(quantity),
         total_cost: session.amount_total ? session.amount_total / 100 : 0, 
@@ -69,16 +83,12 @@ export async function POST(req: Request) {
         supplier_order_id: supplierOrderId
       });
 
-      if (dbError) {
-        console.error("❌ Supabase Insert Error:", dbError.message);
-      } else {
-        console.log("✅ Order successfully recorded in Database.");
-      }
+      if (dbError) console.error("❌ Supabase Error:", dbError.message);
     }
 
     return NextResponse.json({ received: true });
   } catch (err: any) {
-    console.error("❌ Webhook Construct Error:", err.message);
+    console.error("❌ Webhook Error:", err.message);
     return NextResponse.json({ error: err.message }, { status: 400 });
   }
 }
