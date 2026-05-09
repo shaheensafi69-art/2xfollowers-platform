@@ -8,14 +8,14 @@ export async function middleware(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
 
-  // ۱. استثنای حیاتی: باز کردن مسیر ویب‌هوک‌ها برای استرایپ و کریپتو
-  // این خط اجازه می‌دهد درگاه‌ها بدون نیاز به لاگین، دیتابیس را آپدیت کنند
+  // ۱. اجازه عام و تام به استرایپ و سایر ویب‌هوک‌ها
+  // این مسیرها هرگز نباید بلاک شوند تا تراکنش‌ها در دیتابیس ثبت شوند
   if (path.startsWith('/api/webhooks')) {
     return response;
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder';
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
   const supabase = createServerClient(
     supabaseUrl,
@@ -32,21 +32,26 @@ export async function middleware(request: NextRequest) {
     }
   )
 
+  // دریافت وضعیت نشست کاربر
   const { data: { session } } = await supabase.auth.getSession()
 
-  const isPublicPage = path === '/services' || path.startsWith('/products');
-  const isAuthPage = path === '/login' || path === '/signup';
-
+  // ۲. ریدایرکت صفحه اصلی به سرویس‌ها
   if (path === '/') {
     return NextResponse.redirect(new URL('/services', request.url))
   }
 
-  // اینجا ویب‌هوک‌ها قبلاً در خط ۱۷ هندل شده‌اند، پس با خیال راحت بقیه مسیرها را قفل می‌کنیم
+  const isPublicPage = path === '/services' || path.startsWith('/products');
+  const isAuthPage = path === '/login' || path === '/signup' || path === '/forgot-password';
+
+  // ۳. هدایت مشتری لاگین نشده به صفحه لاگین (به جای نمایش ارور JSON)
   if (!session && !isPublicPage && !isAuthPage) {
-    return NextResponse.json({ error: 'Auth required' }, { status: 401 }); 
-    // یا ریدایرکت: return NextResponse.redirect(new URL('/login', request.url))
+    const loginUrl = new URL('/login', request.url);
+    // ذخیره آدرس فعلی برای اینکه بعد از لاگین مشتری دوباره به همینجا برگردد
+    loginUrl.searchParams.set('next', path); 
+    return NextResponse.redirect(loginUrl);
   }
 
+  // اگر کاربر لاگین بود و خواست به صفحه لاگین برود، بفرستش به داشبورد
   if (session && isAuthPage) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
@@ -57,7 +62,7 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * تمام مسیرها به جز موارد زیر را چک کن:
+     * تطبیق تمام مسیرها به جز موارد استاتیک و ویب‌هوک‌ها
      */
     '/((?!_next/static|_next/image|api/webhooks|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
