@@ -6,6 +6,32 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2023-10-16' as any 
 });
 
+// تابع کمکی برای ارسال پیام به تلگرام
+async function sendTelegramNotification(message: string) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  
+  if (!token || !chatId) {
+    console.error("❌ Telegram keys are missing in environment variables.");
+    return;
+  }
+
+  try {
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: 'HTML',
+      }),
+    });
+    console.log("📨 Telegram notification sent!");
+  } catch (err) {
+    console.error("❌ Failed to send Telegram message:", err);
+  }
+}
+
 export async function POST(req: Request) {
   const payload = await req.text();
   const sig = req.headers.get('stripe-signature')!;
@@ -24,34 +50,32 @@ export async function POST(req: Request) {
 
       console.log("🔔 Webhook Received. Session:", session.id);
 
-      // ۱. استخراج اطلاعات اولیه
       const userId = metadata?.userId || 'f76c21e7-fbd9-4700-8fb0-2992a4bf1078';
-      const internalServiceId = metadata?.serviceId || '84'; // آیدی داخلی (مثلاً ۸۴)
+      const internalServiceId = metadata?.serviceId || '84'; 
       const link = metadata?.link || 'No Link Provided';
       const quantity = metadata?.quantity || '1000';
 
       let supplierOrderId = null;
       let realSupplierId = null;
 
-      // ۲. پیدا کردن آیدی ۴ رقمی سپلایر از جدول smm_services
+      // ۱. پیدا کردن آیدی ۴ رقمی سپلایر
       if (internalServiceId) {
         const { data: serviceData } = await supabase
           .from('smm_services')
-          .select('supplier_service_id')
+          .select('supplier_service_id, name')
           .eq('id', parseInt(internalServiceId))
           .single();
         
         realSupplierId = serviceData?.supplier_service_id;
-        console.log(`🔍 Internal ID ${internalServiceId} mapped to Supplier ID: ${realSupplierId}`);
       }
 
-      // ۳. ارسال به FameGrows (فقط اگر آیدی سپلایر پیدا شد)
+      // ۲. ارسال به FameGrows
       if (realSupplierId && metadata?.link) {
         try {
           const formData = new URLSearchParams();
           formData.append('key', '91eebf77733dcda06d6839fa4a4c9b2b'); 
           formData.append('action', 'add');
-          formData.append('service', realSupplierId); // ارسال آیدی ۴ رقمی
+          formData.append('service', realSupplierId); 
           formData.append('link', link);
           formData.append('quantity', quantity);
 
@@ -63,16 +87,13 @@ export async function POST(req: Request) {
           
           if (result.order) {
             supplierOrderId = String(result.order);
-            console.log("✅ FameGrows Success. Order ID:", supplierOrderId);
-          } else {
-            console.error("❌ FameGrows Rejected:", result);
           }
         } catch (err) {
           console.error("❌ FameGrows API Error:", err);
         }
       }
 
-      // ۴. ثبت در دیتابیس (با آیدی داخلی ۸۴ برای حفظ ارتباط جداول)
+      // ۳. ثبت در دیتابیس
       const { error: dbError } = await supabase.from('smm_orders').insert({
         user_id: userId, 
         service_id: parseInt(internalServiceId),
@@ -82,6 +103,22 @@ export async function POST(req: Request) {
         status: supplierOrderId ? 'processing' : 'pending_manual_check',
         supplier_order_id: supplierOrderId
       });
+
+      // ۴. ارسال نوتیفیکیشن به تلگرام شاهین
+      const statusEmoji = supplierOrderId ? "✅" : "⚠️";
+      const telegramMessage = `
+${statusEmoji} <b>اردر جدید در 2X Followers</b>
+━━━━━━━━━━━━━━━━━━
+<b>👤 کاربر:</b> <code>${userId}</code>
+<b>📦 آیدی سپلایر:</b> <code>${realSupplierId}</code>
+<b>🔢 تعداد:</b> <code>${quantity}</code>
+<b>🔗 لینک:</b> ${link}
+<b>💰 مبلغ پرداختی:</b> $${session.amount_total ? session.amount_total / 100 : 0}
+<b>🆔 کد پیگیری سپلایر:</b> <code>${supplierOrderId || 'ثبت نشد'}</code>
+<b>📢 وضعیت:</b> ${supplierOrderId ? 'در حال انجام (API)' : 'نیاز به بررسی دستی'}
+━━━━━━━━━━━━━━━━━━
+`;
+      await sendTelegramNotification(telegramMessage);
 
       if (dbError) console.error("❌ Supabase Error:", dbError.message);
     }
