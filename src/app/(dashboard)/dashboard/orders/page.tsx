@@ -11,15 +11,7 @@ export default function OrdersPage() {
   async function fetchOrders() {
     setLoading(true);
     
-    // ۱. دریافت اطلاعات کاربر لاگین شده
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    // ۲. دریافت سفارش‌ها فقط برای این کاربر
+    // دریافت تمام سفارش‌ها بدون فیلتر کردن یوزر
     const { data, error } = await supabase
       .from('smm_orders')
       .select(`
@@ -28,7 +20,6 @@ export default function OrdersPage() {
           name
         )
       `)
-      .eq('user_id', user.id) // فیلتر کردن بر اساس آیدی کاربر
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -58,14 +49,14 @@ export default function OrdersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center text-slate-900">
         <div>
-          <h2 className="text-2xl font-black text-slate-900">Order History</h2>
-          <p className="text-slate-500">Track all your previous and active orders.</p>
+          <h2 className="text-2xl font-black">All System Orders</h2>
+          <p className="text-slate-500 italic">Showing every order recorded in the database.</p>
         </div>
         <button 
           onClick={fetchOrders}
-          className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+          className="p-2 hover:bg-slate-100 rounded-full transition-all active:scale-90"
         >
           <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
         </button>
@@ -73,42 +64,42 @@ export default function OrdersPage() {
 
       <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center text-slate-500 flex justify-center items-center gap-2">
-            <Loader2 className="animate-spin" /> Loading your orders...
+          <div className="p-12 text-center text-slate-500 flex justify-center items-center gap-2 font-bold uppercase tracking-widest text-xs">
+            <Loader2 className="animate-spin text-emerald-600" /> Refreshing Database...
           </div>
         ) : orders.length === 0 ? (
-          <div className="p-12 text-center text-slate-500">You haven't placed any orders yet.</div>
+          <div className="p-12 text-center text-slate-400 font-medium italic">The database is currently empty.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-slate-50 text-slate-400 text-xs uppercase tracking-wider">
-                  <th className="p-6 font-bold">Service</th>
-                  <th className="p-6 font-bold">Link</th>
-                  <th className="p-6 font-bold">Quantity</th>
-                  <th className="p-6 font-bold">Total Cost</th>
-                  <th className="p-6 font-bold">Status</th>
-                  <th className="p-6 font-bold">Date</th>
+                <tr className="bg-slate-50 text-slate-400 text-[10px] uppercase tracking-[0.2em]">
+                  <th className="p-6 font-black">Service</th>
+                  <th className="p-6 font-black">Link</th>
+                  <th className="p-6 font-black">Quantity</th>
+                  <th className="p-6 font-black">Total Cost</th>
+                  <th className="p-6 font-black">Status</th>
+                  <th className="p-6 font-black">Date</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {orders.map((order) => (
-                  <tr key={order.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-6 font-bold text-slate-700">
-                      {order.smm_services?.name || "Service Order"}
+                  <tr key={order.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="p-6 font-bold text-slate-700 italic">
+                      {order.smm_services?.name || "Global Service"}
                     </td>
-                    <td className="p-6 text-slate-500 truncate max-w-[200px]">
-                      <a href={order.link} target="_blank" className="hover:text-blue-600 underline">
+                    <td className="p-6 text-slate-500 truncate max-w-[200px] text-xs font-medium">
+                      <a href={order.link} target="_blank" className="hover:text-emerald-600 transition-colors">
                         {order.link}
                       </a>
                     </td>
-                    <td className="p-6 font-medium text-slate-600">{order.quantity}</td>
-                    <td className="p-6 font-bold text-emerald-600">
+                    <td className="p-6 font-black text-slate-900">{order.quantity}</td>
+                    <td className="p-6 font-black text-emerald-600">
                       ${Number(order.total_cost || 0).toFixed(2)}
                     </td>
                     <td className="p-6">{getStatusBadge(order.status)}</td>
-                    <td className="p-6 text-sm text-slate-400">
-                      {new Date(order.created_at).toLocaleDateString()}
+                    <td className="p-6 text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                      {new Date(order.created_at).toLocaleString()}
                     </td>
                   </tr>
                 ))}

@@ -8,7 +8,6 @@ import {
   LayoutGrid, Loader2, ArrowUpRight 
 } from 'lucide-react';
 
-// لیست کامل و دقیق ۲۷ دسته‌بندی با استایل اختصاصی
 const PLATFORM_CONFIG: { [key: string]: { icon: any, color: string, bg: string } } = {
   'Instagram': { icon: Instagram, color: 'text-pink-600', bg: 'bg-pink-50' },
   'TikTok': { icon: Music, color: 'text-slate-900', bg: 'bg-slate-100' },
@@ -50,13 +49,14 @@ export default function ServicesPage() {
   useEffect(() => {
     async function fetchServices() {
       setLoading(true);
+      // خواندن مستقیم قیمت‌ها از دیتابیس (بدون دستکاری در کوئری برای حفظ دقت)
       const { data } = await supabase.from('smm_services').select('*').order('price', { ascending: true });
       setServices(data || []);
       setFilteredServices(data || []);
       setLoading(false);
     }
     fetchServices();
-  }, []);
+  }, [supabase]);
 
   const filterServices = (platform: string) => {
     setActiveTab(platform);
@@ -73,10 +73,12 @@ export default function ServicesPage() {
         <h2 className="text-4xl font-black text-slate-900 tracking-tight italic uppercase">
           <span className="text-emerald-600">2X</span> Premium Services
         </h2>
-        <p className="text-slate-500 font-medium text-lg px-1">Discover high-quality growth solutions for 27+ platforms.</p>
+        <p className="text-slate-500 font-medium text-lg px-1">
+          High-performance growth solutions. Prices displayed for <span className="text-slate-900 font-bold underline">10,000 units</span>.
+        </p>
       </div>
 
-      {/* بخش کتگوری‌ها به صورت گرید اکسلی منظم */}
+      {/* Tabs Section */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-px bg-slate-200 border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
         <button 
           onClick={() => filterServices('All')}
@@ -108,7 +110,7 @@ export default function ServicesPage() {
         })}
       </div>
 
-      {/* بخش نمایش محصولات با آیکون داینامیک */}
+      {/* Services List */}
       <div className="space-y-6">
         <div className="flex items-center justify-between px-2">
           <h3 className="font-black text-slate-400 text-xs uppercase tracking-[0.3em]">Service Selection</h3>
@@ -120,16 +122,27 @@ export default function ServicesPage() {
         {loading ? (
           <div className="py-24 flex flex-col items-center justify-center gap-4 bg-white rounded-[3rem] border border-slate-100 shadow-sm">
             <Loader2 className="animate-spin text-emerald-600" size={40} />
-            <p className="text-slate-400 font-black tracking-widest uppercase text-xs">Connecting to Secure Server...</p>
+            <p className="text-slate-400 font-black tracking-widest uppercase text-xs">Fetching latest market rates...</p>
           </div>
         ) : (
           <div className="grid gap-4">
             {filteredServices.map((s) => {
-              // پیدا کردن آیکون مناسب بر اساس نام محصول
               const platformKey = Object.keys(PLATFORM_CONFIG).find(key => s.name.toLowerCase().includes(key.toLowerCase()));
               const PlatformIcon = platformKey ? PLATFORM_CONFIG[platformKey].icon : Zap;
               const platformColor = platformKey ? PLATFORM_CONFIG[platformKey].color : 'text-emerald-600';
               const platformBg = platformKey ? PLATFORM_CONFIG[platformKey].bg : 'bg-emerald-50';
+
+              const isQuantityService = 
+                s.name.toLowerCase().includes('follower') || 
+                s.name.toLowerCase().includes('like') || 
+                s.name.toLowerCase().includes('view') || 
+                s.name.toLowerCase().includes('subscriber') ||
+                s.name.toLowerCase().includes('member');
+
+              // --- منطق برآورد در فرانت‌اند ---
+              // اگر قیمت دیتابیس برای ۱۰۰۰ عدد باشد، برای نمایش ۱۰ هزار تایی ضرب در ۱۰ می‌کنیم
+              const priceFromDB = Number(s.price);
+              const estimatedPrice = isQuantityService ? (priceFromDB * 10).toFixed(2) : priceFromDB.toFixed(2);
 
               return (
                 <div 
@@ -137,7 +150,6 @@ export default function ServicesPage() {
                   className="group bg-white p-5 sm:p-7 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-emerald-50 hover:border-emerald-200 transition-all duration-500 flex flex-col sm:flex-row items-center justify-between gap-6"
                 >
                   <div className="flex items-center gap-6 w-full">
-                    {/* نمایش آیکون پلتفرم داخل کارت */}
                     <div className={`flex w-16 h-16 ${platformBg} rounded-[1.5rem] items-center justify-center ${platformColor} group-hover:scale-110 transition-transform duration-500`}>
                       <PlatformIcon size={28} />
                     </div>
@@ -146,24 +158,30 @@ export default function ServicesPage() {
                         {s.name}
                       </h4>
                       <div className="flex flex-wrap items-center gap-2 mt-2">
-                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">Premium quality</span>
-                        <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">Fast delivery</span>
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">AI-Verified Quality</span>
+                        <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">Instant Processing</span>
+                        {isQuantityService && (
+                          <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100">Bulk 10K Package</span>
+                        )}
                       </div>
                     </div>
                   </div>
 
                   <div className="flex items-center justify-between sm:justify-end gap-10 w-full sm:w-auto border-t sm:border-t-0 pt-5 sm:pt-0">
                     <div className="flex flex-col items-end">
-                      <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] mb-1">Price</span>
+                      <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] mb-1">
+                        {isQuantityService ? 'Estimate for 10,000' : 'Price'}
+                      </span>
                       <div className="flex items-baseline gap-1">
-                         <span className="text-3xl font-black text-slate-900 tracking-tighter">${s.price}</span>
+                         <span className="text-3xl font-black text-slate-900 tracking-tighter">${estimatedPrice}</span>
+                         {isQuantityService && <span className="text-sm font-bold text-slate-400">/10k</span>}
                       </div>
                     </div>
                     <button 
-                      onClick={() => router.push(`/dashboard/new-order?serviceId=${s.id}`)}
+                      onClick={() => router.push(`/dashboard/new-order?serviceId=${s.id}&qty=10000`)}
                       className="flex items-center gap-3 bg-slate-900 text-white px-10 py-5 rounded-2xl font-black hover:bg-emerald-600 transition-all shadow-xl active:scale-95 group/btn"
                     >
-                      ORDER 
+                      ORDER NOW
                       <ArrowUpRight size={20} className="group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1 transition-transform" />
                     </button>
                   </div>
