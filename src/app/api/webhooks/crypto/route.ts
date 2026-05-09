@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 export async function POST(req: Request) {
-  // ۱. دریافت دیتای خام از درگاه (NowPayments یا هر درگاه مشابه)
+  // ۱. دریافت دیتای ورودی بدون فرض قبلی
   const payload = await req.json();
   
   const supabase = createClient(
@@ -11,76 +11,84 @@ export async function POST(req: Request) {
   );
 
   try {
-    // ۲. استخراج اطلاعات داینامیک از فیلد order_id
-    // فرمت ارسالی شما: userId_serviceId_quantity_link
-    if (!payload.order_id) {
-      console.error("❌ No order_id found in payload");
-      return NextResponse.json({ error: "No order_id" }, { status: 400 });
+    let orderData = {
+      userId: "",
+      serviceId: "",
+      quantity: "",
+      link: ""
+    };
+
+    // ۲. منطق استخراج دیتای عمومی (اگر در متادیتا نبود، از order_id استفاده کن)
+    if (payload.metadata && payload.metadata.serviceId) {
+      orderData.userId = payload.metadata.userId;
+      orderData.serviceId = payload.metadata.serviceId;
+      orderData.quantity = payload.metadata.quantity;
+      orderData.link = payload.metadata.link;
+    } 
+    else if (payload.order_id) {
+      // تجزیه رشته بر اساس جداکننده استاندارد سیستم تو (_)
+      const parts = payload.order_id.split('_');
+      orderData.userId = parts[0];
+      orderData.serviceId = parts[1];
+      orderData.quantity = parts[2];
+      // بازسازی لینک و اصلاح کاراکترهای تغییر یافته
+      orderData.link = parts.slice(3).join('_').replace(/\|/g, '/');
     }
 
-    const parts = payload.order_id.split('_');
-    const userId = parts[0];
-    const internalServiceId = parts[1];
-    const quantity = parts[2];
-    // بازسازی لینک: بخش‌های باقی‌مانده را به هم می‌چسبانیم و کاراکترهای لوله | را به / تبدیل می‌کنیم
-    const link = parts.slice(3).join('_').replace(/\|/g, '/');
+    // بررسی امنیتی: اگر اطلاعات پایه استخراج نشد، عملیات را متوقف کن
+    if (!orderData.serviceId || !orderData.link) {
+      console.error("❌ Unable to parse dynamic order data from payload");
+      return NextResponse.json({ error: "Invalid order data" }, { status: 400 });
+    }
 
-    console.log(`📦 Processing Order: User:${userId}, Service:${internalServiceId}, Qty:${quantity}`);
-
-    // ۳. پیدا کردن آیدی ۴ رقمی سپلایر از دیتابیس (داینامیک برای هر سرویس)
+    // ۳. پیدا کردن آیدی سپلایر به صورت داینامیک از دیتابیس
     const { data: serviceData } = await supabase
       .from('smm_services')
       .select('supplier_service_id')
-      .eq('id', parseInt(internalServiceId))
+      .eq('id', parseInt(orderData.serviceId))
       .single();
 
-    const realSupplierId = serviceData?.supplier_service_id;
-    let supplierOrderId = null;
+    const finalSupplierServiceId = serviceData?.supplier_service_id || orderData.serviceId;
+    let supplierResponseId = null;
 
-    // ۴. ارسال خودکار به FameGrows (فقط اگر آیدی سپلایر معتبر باشد)
-    if (realSupplierId && link) {
-      try {
-        const formData = new URLSearchParams();
-        formData.append('key', '91eebf77733dcda06d6839fa4a4c9b2b');
-        formData.append('action', 'add');
-        formData.append('service', String(realSupplierId));
-        formData.append('link', link);
-        formData.append('quantity', quantity);
+    // ۴. ارسال خودکار به سپلایر (FameGrows)
+    try {
+      const formData = new URLSearchParams();
+      formData.append('key', '91eebf77733dcda06d6839fa4a4c9b2b');
+      formData.append('action', 'add');
+      formData.append('service', String(finalSupplierServiceId));
+      formData.append('link', orderData.link);
+      formData.append('quantity', String(orderData.quantity));
 
-        const res = await fetch('https://famegrows.com/api/v2', { method: 'POST', body: formData });
-        const result = await res.json();
-        
-        if (result.order) {
-          supplierOrderId = String(result.order);
-        }
-      } catch (err) {
-        console.error("❌ FameGrows API Error:", err);
-      }
+      const res = await fetch('https://famegrows.com/api/v2', { method: 'POST', body: formData });
+      const result = await res.json();
+      if (result.order) supplierResponseId = String(result.order);
+    } catch (apiErr) {
+      console.error("❌ Supplier API Connection Error:", apiErr);
     }
 
-    // ۵. ثبت داینامیک در دیتابیس smm_orders
+    // ۵. ثبت نهایی در دیتابیس smm_orders به صورت داینامیک
     const { error: dbError } = await supabase.from('smm_orders').insert({
-      user_id: userId,
-      service_id: realSupplierId ? parseInt(realSupplierId) : parseInt(internalServiceId),
-      link: link,
-      quantity: parseInt(quantity),
+      user_id: orderData.userId,
+      service_id: parseInt(finalSupplierServiceId),
+      link: orderData.link,
+      quantity: parseInt(orderData.quantity),
       total_cost: parseFloat(payload.actually_paid || payload.amount || "0"),
-      status: supplierOrderId ? 'processing' : 'pending_manual_check',
-      supplier_order_id: supplierOrderId
+      status: supplierResponseId ? 'processing' : 'pending_manual_check',
+      supplier_order_id: supplierResponseId
     });
 
-    // ۶. ارسال نوتیفیکیشن زنده به تلگرام
-    const statusEmoji = supplierOrderId ? "✅" : "⚠️";
+    // ۶. اطلاع‌رسانی تلگرام بدون متن ثابت
     const telegramMessage = `
-${statusEmoji} <b>اردر جدید (Crypto)</b>
+📦 <b>اردر جدید ثبت شد</b>
 ━━━━━━━━━━━━━━━━━━
-<b>👤 کاربر:</b> <code>${userId}</code>
-<b>📦 سرویس:</b> <code>${realSupplierId || internalServiceId}</code>
-<b>🔢 تعداد:</b> <code>${quantity}</code>
-<b>🔗 لینک:</b> ${link}
-<b>💰 مبلغ:</b> ${payload.actually_paid || payload.amount} ${payload.pay_currency || ''}
-<b>🆔 کد سپلایر:</b> <code>${supplierOrderId || 'Manual Check'}</code>
-<b>🗄 دیتابیس:</b> ${dbError ? '❌ خطا' : '✅ ثبت شد'}
+<b>👤 کاربر:</b> <code>${orderData.userId}</code>
+<b>📦 سرویس:</b> <code>${finalSupplierServiceId}</code>
+<b>🔢 تعداد:</b> <code>${orderData.quantity}</code>
+<b>🔗 لینک:</b> ${orderData.link}
+<b>💰 مبلغ:</b> ${payload.actually_paid || payload.amount || 'N/A'} ${payload.pay_currency || ''}
+<b>🆔 کد سپلایر:</b> <code>${supplierResponseId || 'Manual Check'}</code>
+<b>🗄 دیتابیس:</b> ${dbError ? '❌ خطا' : '✅ موفق'}
 ━━━━━━━━━━━━━━━━━━
 `;
 
@@ -92,7 +100,7 @@ ${statusEmoji} <b>اردر جدید (Crypto)</b>
 
     return NextResponse.json({ received: true });
   } catch (err: any) {
-    console.error("❌ Webhook Error:", err.message);
+    console.error("❌ Universal Webhook Error:", err.message);
     return NextResponse.json({ error: err.message }, { status: 400 });
   }
 }
