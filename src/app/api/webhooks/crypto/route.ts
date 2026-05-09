@@ -34,14 +34,14 @@ export async function POST(req: Request) {
       );
 
       await supabase.from('smm_orders').insert({
-        user_id: parseInt(userId),
-        service_id: parseInt(serviceId),
-        link: link,
-        quantity: parseInt(quantity),
-        total_cost: body.actually_paid || body.price_amount,
-        status: result.order ? 'processing' : 'error',
-        supplier_order_id: result.order ? String(result.order) : null
-      });
+  user_id: userId && userId !== '0' ? parseInt(userId) : null, // اگر آیدی نبود، نال بفرستد
+  service_id: parseInt(serviceId),
+  link: link,
+  quantity: parseInt(quantity),
+  total_cost: parseFloat(body.actually_paid || body.price_amount || 0), // تبدیل به عدد اعشاری
+  status: result.order ? 'processing' : 'error',
+  supplier_order_id: result.order ? String(result.order) : null
+});
     }
 
     return NextResponse.json({ ok: true });
