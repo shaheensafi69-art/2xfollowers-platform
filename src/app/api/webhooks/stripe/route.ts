@@ -22,60 +22,58 @@ export async function POST(req: Request) {
       const session = event.data.object as Stripe.Checkout.Session;
       const metadata = session.metadata;
 
-      console.log("🔔 Webhook Received. Session:", session.id);
-
-      // ۱. استخراج اطلاعات اولیه
+      // ۱. دریافت آیدی داخلی از متادیتا (مثلاً ۸۴)
+      const internalId = metadata?.serviceId || "84"; 
       const userId = metadata?.userId || 'f76c21e7-fbd9-4700-8fb0-2992a4bf1078';
-      const internalServiceId = metadata?.serviceId || '84'; // آیدی داخلی (مثلاً ۸۴)
       const link = metadata?.link || 'No Link Provided';
       const quantity = metadata?.quantity || '1000';
 
+      // ۲. جستجوی Supplier Service ID (آیدی ۴ رقمی) از دیتابیس قبل از هر کاری
+      const { data: serviceData, error: searchError } = await supabase
+        .from('smm_services')
+        .select('supplier_service_id')
+        .eq('id', parseInt(internalId))
+        .single();
+
+      if (searchError || !serviceData) {
+        console.error("❌ Service mapping not found for ID:", internalId);
+        return NextResponse.json({ error: "Service not found" }, { status: 404 });
+      }
+
+      const realSupplierId = serviceData.supplier_service_id; // آیدی ۴ رقمی اصلی
+      console.log(`🎯 Mapping: Internal ${internalId} -> Supplier ${realSupplierId}`);
+
       let supplierOrderId = null;
-      let realSupplierId = null;
 
-      // ۲. پیدا کردن آیدی ۴ رقمی سپلایر از جدول smm_services
-      if (internalServiceId) {
-        const { data: serviceData } = await supabase
-          .from('smm_services')
-          .select('supplier_service_id')
-          .eq('id', parseInt(internalServiceId))
-          .single();
+      // ۳. صدا زدن سپلایر با آیدی ۴ رقمی اصلی
+      try {
+        const formData = new URLSearchParams();
+        formData.append('key', '91eebf77733dcda06d6839fa4a4c9b2b'); 
+        formData.append('action', 'add');
+        formData.append('service', String(realSupplierId)); 
+        formData.append('link', link);
+        formData.append('quantity', quantity);
+
+        const supplierResponse = await fetch('https://famegrows.com/api/v2', {
+          method: 'POST',
+          body: formData,
+        });
+        const result = await supplierResponse.json();
         
-        realSupplierId = serviceData?.supplier_service_id;
-        console.log(`🔍 Internal ID ${internalServiceId} mapped to Supplier ID: ${realSupplierId}`);
-      }
-
-      // ۳. ارسال به FameGrows (فقط اگر آیدی سپلایر پیدا شد)
-      if (realSupplierId && metadata?.link) {
-        try {
-          const formData = new URLSearchParams();
-          formData.append('key', '91eebf77733dcda06d6839fa4a4c9b2b'); 
-          formData.append('action', 'add');
-          formData.append('service', realSupplierId); // ارسال آیدی ۴ رقمی
-          formData.append('link', link);
-          formData.append('quantity', quantity);
-
-          const supplierResponse = await fetch('https://famegrows.com/api/v2', {
-            method: 'POST',
-            body: formData,
-          });
-          const result = await supplierResponse.json();
-          
-          if (result.order) {
-            supplierOrderId = String(result.order);
-            console.log("✅ FameGrows Success. Order ID:", supplierOrderId);
-          } else {
-            console.error("❌ FameGrows Rejected:", result);
-          }
-        } catch (err) {
-          console.error("❌ FameGrows API Error:", err);
+        if (result.order) {
+          supplierOrderId = String(result.order);
+          console.log("✅ Supplier Success. ID:", supplierOrderId);
+        } else {
+          console.error("❌ Supplier Rejected Request:", result);
         }
+      } catch (err) {
+        console.error("❌ FameGrows API Connection Error:", err);
       }
 
-      // ۴. ثبت در دیتابیس (با آیدی داخلی ۸۴ برای حفظ ارتباط جداول)
+      // ۴. ثبت در دیتابیس: حالا در ستون service_id مستقیماً آیدی سپلایر (realSupplierId) ذخیره می‌شود
       const { error: dbError } = await supabase.from('smm_orders').insert({
         user_id: userId, 
-        service_id: parseInt(internalServiceId),
+        service_id: parseInt(realSupplierId), // ذخیره مستقیم آیدی ۴ رقمی سپلایر
         link: link,
         quantity: parseInt(quantity),
         total_cost: session.amount_total ? session.amount_total / 100 : 0, 
@@ -83,7 +81,7 @@ export async function POST(req: Request) {
         supplier_order_id: supplierOrderId
       });
 
-      if (dbError) console.error("❌ Supabase Error:", dbError.message);
+      if (dbError) console.error("❌ DB Insert Error:", dbError.message);
     }
 
     return NextResponse.json({ received: true });
