@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY! // استفاده از کلید سیستمی برای دسترسی کامل
+    process.env.SUPABASE_SERVICE_ROLE_KEY! 
   );
 
   try {
@@ -22,17 +22,27 @@ export async function POST(req: Request) {
       const session = event.data.object as Stripe.Checkout.Session;
       const metadata = session.metadata;
 
-      if (metadata && metadata.serviceId && metadata.link) {
-        
-        // ۱. ارسال سفارش به FameGrows
-        let supplierOrderId = null;
+      // لاگ کردن برای عیب‌یابی در ورسل
+      console.log("🔔 Stripe Webhook Received for session:", session.id);
+      console.log("📦 Metadata found:", metadata);
+
+      // متغیرها را با امنیت استخراج می‌کنیم
+      const userId = metadata?.userId || 'f76c21e7-fbd9-4700-8fb0-2992a4bf1078'; // یوزر آیدی خودت به عنوان بک‌آپ
+      const serviceId = metadata?.serviceId || null;
+      const link = metadata?.link || 'No Link Provided';
+      const quantity = metadata?.quantity || '10000';
+
+      let supplierOrderId = null;
+
+      // فقط اگر اطلاعات سرویس کامل بود، به FameGrows بفرست
+      if (serviceId && metadata?.link) {
         try {
           const formData = new URLSearchParams();
-          formData.append('key', '91eebf77733dcda06d6839fa4a4c9b2b'); // API Key تو
+          formData.append('key', '91eebf77733dcda06d6839fa4a4c9b2b'); 
           formData.append('action', 'add');
-          formData.append('service', metadata.serviceId);
+          formData.append('service', serviceId);
           formData.append('link', metadata.link);
-          formData.append('quantity', metadata.quantity || '10000');
+          formData.append('quantity', quantity);
 
           const supplierResponse = await fetch('https://famegrows.com/api/v2', {
             method: 'POST',
@@ -40,31 +50,35 @@ export async function POST(req: Request) {
           });
           const result = await supplierResponse.json();
           supplierOrderId = result.order ? String(result.order) : null;
+          console.log("✅ FameGrows Order Sent. ID:", supplierOrderId);
         } catch (err) {
-          console.error("FameGrows API Error:", err);
+          console.error("❌ FameGrows API Error:", err);
         }
+      } else {
+        console.warn("⚠️ Metadata missing serviceId or link. Skipping FameGrows call.");
+      }
 
-        // ۲. ثبت نهایی در جدول smm_orders
-        // نام ستون‌ها دقیقاً طبق دیتابیس تو (user_id, service_id, total_cost)
-        const { error: dbError } = await supabase.from('smm_orders').insert({
-          user_id: metadata.userId, 
-          service_id: parseInt(metadata.serviceId),
-          link: metadata.link,
-          quantity: parseInt(metadata.quantity || '10000'),
-          total_cost: session.amount_total ? session.amount_total / 100 : 0, 
-          status: supplierOrderId ? 'processing' : 'pending_metadata',
-          supplier_order_id: supplierOrderId
-        });
+      // ثبت در دیتابیس تحت هر شرایطی (حتی با دیتای تستی یا ناقص)
+      const { error: dbError } = await supabase.from('smm_orders').insert({
+        user_id: userId, 
+        service_id: serviceId ? parseInt(serviceId) : 0,
+        link: link,
+        quantity: parseInt(quantity),
+        total_cost: session.amount_total ? session.amount_total / 100 : 0, 
+        status: supplierOrderId ? 'processing' : 'pending_manual_check',
+        supplier_order_id: supplierOrderId
+      });
 
-        if (dbError) {
-          console.error("Supabase Error during webhook:", dbError.message);
-        }
+      if (dbError) {
+        console.error("❌ Supabase Insert Error:", dbError.message);
+      } else {
+        console.log("✅ Order successfully recorded in Database.");
       }
     }
 
     return NextResponse.json({ received: true });
   } catch (err: any) {
-    console.error("Webhook Error:", err.message);
+    console.error("❌ Webhook Construct Error:", err.message);
     return NextResponse.json({ error: err.message }, { status: 400 });
   }
 }
