@@ -6,7 +6,14 @@ export async function middleware(request: NextRequest) {
     request: { headers: request.headers },
   })
 
-  // جلوگیری از کرش در صورت نبود متغیرهای محیطی در زمان لوکال یا بیلد
+  const path = request.nextUrl.pathname;
+
+  // ۱. استثنای حیاتی: باز کردن مسیر ویب‌هوک‌ها برای استرایپ و کریپتو
+  // این خط اجازه می‌دهد درگاه‌ها بدون نیاز به لاگین، دیتابیس را آپدیت کنند
+  if (path.startsWith('/api/webhooks')) {
+    return response;
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder';
 
@@ -26,28 +33,20 @@ export async function middleware(request: NextRequest) {
   )
 
   const { data: { session } } = await supabase.auth.getSession()
-  const path = request.nextUrl.pathname;
 
-  // ۱. مسیرهای کاملاً عمومی (سرویس‌ها و محصولات برای همه باز باشد)
   const isPublicPage = path === '/services' || path.startsWith('/products');
-  
-  // ۲. مسیرهای مربوط به ورود و ثبت نام
   const isAuthPage = path === '/login' || path === '/signup';
 
-  // منطق درخواستی تو:
-  
-  // الف) اگر کاربر در صفحه اصلی (/) است
   if (path === '/') {
     return NextResponse.redirect(new URL('/services', request.url))
   }
 
-  // ب) اگر کاربر لاگین نیست و می‌خواهد به بخش‌های خصوصی (مثل دشبورد یا ثبت سفارش) برود
-  // ما اینجا فرض می‌کنیم هر مسیری غیر از سرویس‌ها و لاگین، نیاز به ورود دارد
+  // اینجا ویب‌هوک‌ها قبلاً در خط ۱۷ هندل شده‌اند، پس با خیال راحت بقیه مسیرها را قفل می‌کنیم
   if (!session && !isPublicPage && !isAuthPage) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    return NextResponse.json({ error: 'Auth required' }, { status: 401 }); 
+    // یا ریدایرکت: return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // ج) اگر کاربر لاگین است و بیخودی به صفحه لاگین می‌رود
   if (session && isAuthPage) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
