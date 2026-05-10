@@ -1,7 +1,8 @@
 "use client";
 import { useState } from 'react';
 import Link from 'next/link';
-import { Menu, X, LayoutDashboard, Zap, ShoppingBag, Settings } from 'lucide-react';
+// اضافه کردن آیکون PhoneIncoming برای بخش تماس
+import { Menu, X, LayoutDashboard, Zap, ShoppingBag, Settings, PhoneIncoming } from 'lucide-react';
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -10,6 +11,7 @@ export default function Navbar() {
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'New Order', href: '/dashboard/new-order', icon: Zap },
     { name: 'Services', href: '/services', icon: ShoppingBag },
+    { name: 'Contact', href: '/dashboard/contact', icon: PhoneIncoming }, // اضافه شدن صفحه کانتکت
     { name: 'Settings', href: '/dashboard/settings', icon: Settings },
   ];
 
@@ -22,7 +24,7 @@ export default function Navbar() {
           <span className="text-slate-900 ml-1">FOLLOWERS</span>
         </Link>
 
-        {/* منوی کامپیوتر (بدون دکمه لاگین) */}
+        {/* منوی کامپیوتر */}
         <div className="hidden lg:flex items-center gap-8">
           {navLinks.map((link) => (
             <Link 
@@ -41,8 +43,8 @@ export default function Navbar() {
         </button>
       </div>
 
-      {/* منوی کشویی موبایل (بدون دکمه ساین‌این) */}
-      <div className={`lg:hidden absolute top-20 left-0 w-full bg-white border-b border-slate-100 transition-all duration-300 overflow-hidden ${isOpen ? 'max-h-[350px] py-6' : 'max-h-0'}`}>
+      {/* منوی کشویی موبایل */}
+      <div className={`lg:hidden absolute top-20 left-0 w-full bg-white border-b border-slate-100 transition-all duration-300 overflow-hidden ${isOpen ? 'max-h-[400px] py-6' : 'max-h-0'}`}>
         <div className="flex flex-col px-6 gap-6">
           {navLinks.map((link) => (
             <Link 
