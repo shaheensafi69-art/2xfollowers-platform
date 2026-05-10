@@ -1,44 +1,54 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
 export async function POST(req: Request) {
   try {
-    const { amount, userId } = await req.json();
-    const apiKey = process.env.HESABPAY_API_KEY;
+    const { userId, serviceId, serviceName, quantity, link, amount, transactionInfo } = await req.json();
 
-    // ۱. ارسال درخواست
-    const response = await fetch('https://api.hesabpay.com/api/v1/checkout/request', {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    // ۱. ثبت در دیتابیس با وضعیت pending_manual_check
+    const { error: dbError } = await supabase.from('smm_orders').insert({
+      user_id: userId,
+      service_id: parseInt(serviceId),
+      link: link,
+      quantity: parseInt(quantity),
+      total_cost: parseFloat(amount),
+      status: 'pending_manual_check',
+      supplier_order_id: `HP-${transactionInfo}` // کد تراکنش را اینجا ذخیره می‌کنیم
+    });
+
+    if (dbError) throw new Error(dbError.message);
+
+    // ۲. ارسال گزارش کامل به تلگرام برای تایید دستی شما
+    const telegramMessage = `
+🏦 <b>Manual Payment: HesabPay</b>
+━━━━━━━━━━━━━━━━━━
+<b>👤 User ID:</b> <code>${userId}</code>
+<b>📦 Service:</b> <code>${serviceName}</code>
+<b>🔢 Quantity:</b> <code>${quantity}</code>
+<b>🔗 Link:</b> ${link}
+<b>💰 Amount:</b> ${amount}
+<b>📝 TX Info:</b> ${transactionInfo}
+━━━━━━━━━━━━━━━━━━
+✅ <i>Check your HesabPay app. If received, start the order manually.</i>
+`;
+
+    await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        apiKey: apiKey,
-        amount: amount,
-        currency: "AFN",
-        externalId: userId, // این خط بسیار حیاتی است! برای اینکه ویب‌هوک بفهمد پول مال کیست
-        description: `Wallet Top-up for user ${userId}`,
-        callbackUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/api/webhooks/hesabpay`,
+        chat_id: process.env.TELEGRAM_CHAT_ID,
+        text: telegramMessage,
+        parse_mode: 'HTML',
       }),
     });
 
-    // ۲. خواندن متن خام پاسخ برای عیب‌یابی
-    const responseText = await response.text();
-    console.log("Raw Response from HesabPay:", responseText);
-
-    try {
-      const data = JSON.parse(responseText);
-      if (data.url || data.payment_url) {
-        return NextResponse.json({ url: data.url || data.payment_url });
-      } else {
-        return NextResponse.json({ error: data.message || "خطا در پاسخ حساب‌پی" }, { status: 400 });
-      }
-    } catch (e) {
-      return NextResponse.json({ error: "پاسخ سرور حساب‌پی معتبر نیست (JSON error)" }, { status: 500 });
-    }
-
+    return NextResponse.json({ success: true, message: "Order submitted for review" });
   } catch (err: any) {
-    console.error("Connection Error:", err.message);
-    return NextResponse.json({ error: "ارتباط با سرور حساب‌پی برقرار نشد" }, { status: 500 });
+    return NextResponse.json({ success: false, error: err.message }, { status: 400 });
   }
 }

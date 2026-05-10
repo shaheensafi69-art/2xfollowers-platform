@@ -40,8 +40,8 @@ const PLATFORM_UI: { [key: string]: { icon: any, color: string, bg: string } } =
 
 const PAYMENT_GATEWAYS = [
   { id: 'stripe', name: 'Credit Card', icon: CreditCard, color: 'bg-indigo-600', status: 'active' },
-  { id: 'crypto', name: 'Crypto', icon: Coins, color: 'bg-orange-500', status: 'active' }, // فعال شد
-  { id: 'hesabpay', name: 'HesabPay', icon: ShieldCheck, color: 'bg-emerald-600', status: 'soon' },
+  { id: 'crypto', name: 'Crypto', icon: Coins, color: 'bg-orange-500', status: 'active' },
+  { id: 'hesabpay', name: 'HesabPay', icon: Wallet, color: 'bg-emerald-600', status: 'active' }, // فعال شد
   { id: 'paypal', name: 'PayPal', icon: Globe, color: 'bg-blue-500', status: 'soon' },
 ];
 
@@ -103,7 +103,33 @@ export default function NewOrderPage() {
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
+      if (gatewayId === 'hesabpay') {
+        const response = await fetch(`/api/checkout/hesabpay`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: total,
+            userId: user?.id,
+            serviceId: selectedService.id,
+            serviceName: selectedService.name,
+            link: link,
+            quantity: isFixedProduct ? 1 : quantity,
+            transactionInfo: "Pending Scan"
+          }),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          router.push(`/dashboard/confirm-payment?amount=${total}&serviceName=${encodeURIComponent(selectedService.name)}`);
+        } else {
+          alert("Error: " + data.error);
+        }
+
+        return;
+      }
+
       const response = await fetch(`/api/checkout/${gatewayId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -113,18 +139,21 @@ export default function NewOrderPage() {
           serviceId: selectedService.id,
           serviceName: selectedService.name,
           link: link,
-          quantity: isFixedProduct ? 1 : quantity
+          quantity: isFixedProduct ? 1 : quantity,
+          transactionInfo: ""
         }),
       });
 
       const data = await response.json();
-      if (data.url) {
+
+      if (data.success && data.url) {
         window.location.href = data.url;
       } else {
-        alert("Payment Error: " + (data.error || "Failed to generate link"));
+        alert("Error: " + (data.error || "Payment initiation failed."));
       }
-    } catch (err) {
-      alert("Connection failed. Please try again.");
+    } catch (error) {
+      console.error(error);
+      alert("An error occurred while processing payment.");
     } finally {
       setIsSubmitting(false);
     }
@@ -208,7 +237,8 @@ export default function NewOrderPage() {
                   <button 
                     key={gt.id} 
                     onClick={() => handlePayment(gt.id, gt.status)}
-                    className={`relative flex flex-col items-center justify-center p-4 rounded-[2rem] border-2 transition-all group ${gt.status === 'soon' ? 'opacity-50 grayscale border-slate-50' : 'border-slate-100 hover:border-indigo-500 hover:bg-indigo-50'}`}
+                    disabled={isSubmitting}
+                    className={`relative flex flex-col items-center justify-center p-4 rounded-[2rem] border-2 transition-all group ${gt.status === 'soon' ? 'opacity-50 grayscale border-slate-50' : 'border-slate-100 hover:border-emerald-500 hover:bg-emerald-50'}`}
                   >
                     <div className={`${gt.color} p-3 rounded-xl text-white mb-2 shadow-lg group-hover:scale-110 transition-transform`}><gt.icon size={20} /></div>
                     <span className="font-black text-[8px] uppercase tracking-widest text-slate-700 text-center">{gt.name}</span>
