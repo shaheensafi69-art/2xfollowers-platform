@@ -10,7 +10,16 @@ export async function POST(req: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // ۱. ثبت در دیتابیس با وضعیت pending_manual_check
+    // ۱. پیدا کردن آیدی ۴ رقمی سپلایر از جدول خدمات
+    const { data: serviceData } = await supabase
+      .from('smm_services')
+      .select('supplier_service_id')
+      .eq('id', parseInt(serviceId))
+      .single();
+
+    const supplierId = serviceData?.supplier_service_id || "Not Found";
+
+    // ۲. ثبت در دیتابیس با وضعیت pending_manual_check
     const { error: dbError } = await supabase.from('smm_orders').insert({
       user_id: userId,
       service_id: parseInt(serviceId),
@@ -18,23 +27,24 @@ export async function POST(req: Request) {
       quantity: parseInt(quantity),
       total_cost: parseFloat(amount),
       status: 'pending_manual_check',
-      supplier_order_id: `HP-${transactionInfo}` // کد تراکنش را اینجا ذخیره می‌کنیم
+      supplier_order_id: `HP-${transactionInfo}`
     });
 
     if (dbError) throw new Error(dbError.message);
 
-    // ۲. ارسال گزارش کامل به تلگرام برای تایید دستی شما
+    // ۳. ارسال گزارش کامل به تلگرام (حالا شامل آیدی ۴ رقمی سپلایر)
     const telegramMessage = `
 🏦 <b>Manual Payment: HesabPay</b>
 ━━━━━━━━━━━━━━━━━━
 <b>👤 User ID:</b> <code>${userId}</code>
-<b>📦 Service:</b> <code>${serviceName}</code>
+<b>📦 Service Name:</b> <code>${serviceName}</code>
+<b>🆔 Supplier ID:</b> <code>${supplierId}</code>  <-- (آیدی ۴ رقمی)
 <b>🔢 Quantity:</b> <code>${quantity}</code>
 <b>🔗 Link:</b> ${link}
-<b>💰 Amount:</b> ${amount}
-<b>📝 TX Info:</b> ${transactionInfo}
+<b>💰 Amount:</b> ${amount} USD
+<b>📝 Memo/Info:</b> ${transactionInfo}
 ━━━━━━━━━━━━━━━━━━
-✅ <i>Check your HesabPay app. If received, start the order manually.</i>
+✅ <i>Check HesabPay. If confirmed, use Supplier ID ${supplierId} to process.</i>
 `;
 
     await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
@@ -47,7 +57,7 @@ export async function POST(req: Request) {
       }),
     });
 
-    return NextResponse.json({ success: true, message: "Order submitted for review" });
+    return NextResponse.json({ success: true, message: "Order submitted" });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 400 });
   }
