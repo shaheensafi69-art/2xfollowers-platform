@@ -9,6 +9,15 @@ export async function POST(req: Request) {
   );
 
   try {
+    // 🔒 قفل امنیتی اول: بررسی وضعیت پرداخت در NowPayments
+    // سیستم فقط باید زمانی سفارش را پردازش کند که پول ۱۰۰٪ دریافت شده باشد
+    const paymentStatus = payload.payment_status;
+    
+    if (paymentStatus !== 'finished') {
+      console.log(`⏳ Webhook received for status: ${paymentStatus}. Skipping processing.`);
+      return NextResponse.json({ received: true, message: "Waiting for finished status" });
+    }
+
     let orderData = { userId: "", serviceId: "", quantity: "", link: "" };
 
     // ۱. استخراج اطلاعات داینامیک
@@ -22,9 +31,14 @@ export async function POST(req: Request) {
     } else if (payload.order_id) {
       const parts = payload.order_id.split('_');
       orderData.userId = parts[0];
-      orderData.serviceId = parts[1]; // این همان آیدی داخلی است (مثل 84)
+      orderData.serviceId = parts[1]; 
       orderData.quantity = parts[2];
       orderData.link = parts.slice(3).join('_').replace(/\|/g, '/');
+    }
+
+    // بررسی وجود دیتای حیاتی سفارش
+    if (!orderData.serviceId || !orderData.link) {
+      return NextResponse.json({ error: "Invalid order metadata" }, { status: 400 });
     }
 
     // ۲. پیدا کردن آیدی ۴ رقمی سپلایر فقط برای ارسال به API
@@ -37,7 +51,7 @@ export async function POST(req: Request) {
     const supplierServiceId = serviceData?.supplier_service_id;
     let supplierResponseId = null;
 
-    // ۳. ارسال به سپلایر (با آیدی ۴ رقمی)
+    // ۳. ارسال به سپلایر (با آیدی ۴ رقمی) فقط و فقط پس از تایید پرداخت
     if (supplierServiceId) {
       try {
         const formData = new URLSearchParams();
@@ -51,14 +65,14 @@ export async function POST(req: Request) {
         const result = await res.json();
         if (result.order) supplierResponseId = String(result.order);
       } catch (err) {
-        console.error("API Error:", err);
+        console.error("API Error to Supplier:", err);
       }
     }
 
     // ۴. ثبت در دیتابیس (با آیدی داخلی برای رفع ارور Foreign Key)
     const { error: dbError } = await supabase.from('smm_orders').insert({
       user_id: orderData.userId,
-      service_id: parseInt(orderData.serviceId), // ذخیره آیدی داخلی (مثل 84)
+      service_id: parseInt(orderData.serviceId), 
       link: orderData.link,
       quantity: parseInt(orderData.quantity),
       total_cost: parseFloat(String(payload.actually_paid || payload.amount || "0")),
@@ -69,12 +83,13 @@ export async function POST(req: Request) {
     // ۵. گزارش تلگرام
     const dbStatus = dbError ? `❌ خطا: ${dbError.message}` : "✅ ثبت موفق در دیتابیس";
     const telegramMessage = `
-📦 <b>گزارش نهایی سیستم</b>
+💰 <b>کریپتو موفق (NowPayments)</b>
 ━━━━━━━━━━━━━━━━━━
 <b>👤 کاربر:</b> <code>${orderData.userId}</code>
 <b>📦 آیدی داخلی:</b> <code>${orderData.serviceId}</code>
 <b>🆔 آیدی سپلایر:</b> <code>${supplierServiceId}</code>
 <b>🔢 تعداد:</b> <code>${orderData.quantity}</code>
+<b>💵 مبلغ واقعی پرداختی:</b> <code>${payload.actually_paid} ${payload.pay_currency}</code>
 <b>🆔 اردر سپلایر:</b> <code>${supplierResponseId || 'Manual'}</code>
 <b>🗄 دیتابیس:</b> ${dbStatus}
 ━━━━━━━━━━━━━━━━━━
@@ -88,6 +103,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ received: true });
   } catch (err: any) {
+    console.error("Webhook Internal Error:", err.message);
     return NextResponse.json({ error: err.message }, { status: 400 });
   }
 }
