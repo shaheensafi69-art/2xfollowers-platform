@@ -3,23 +3,39 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '../../../utils/supabase/client';
-import { User, Mail, Lock, CheckCircle2 } from 'lucide-react';
+import { User, Mail, Lock, CheckCircle2, Phone, Globe, Calendar } from 'lucide-react';
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [country, setCountry] = useState('');
+  const [dob, setDob] = useState('');
   const [loading, setLoading] = useState(false);
   const supabase = createClient();
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
+    // تقسیم نام کامل به نام و نام خانوادگی برای دیتابیس
+    const nameParts = fullName.trim().split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+
     const { error } = await supabase.auth.signUp({ 
       email, 
       password,
       options: { 
-        data: { full_name: fullName },
+        data: { 
+          first_name: firstName,
+          last_name: lastName,
+          phone: phone,
+          country: country,
+          date_of_birth: dob,
+          balance: 0 // مقدار اولیه کیف پول
+        },
         emailRedirectTo: `${window.location.origin}/auth/callback`
       } 
     });
@@ -34,8 +50,8 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4 sm:p-6 font-sans">
-      <div className="w-full max-w-[480px]">
+    <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4 sm:p-6 font-sans my-10">
+      <div className="w-full max-w-[520px]">
         {/* بخش تایپوگرافی برند */}
         <div className="text-center mb-8 sm:mb-10">
           <div className="mb-4 inline-block">
@@ -54,8 +70,10 @@ export default function SignupPage() {
           <h2 className="text-xl font-bold text-slate-800 mb-6 text-center uppercase tracking-wide">Create Account</h2>
           
           <form onSubmit={handleSignup} className="space-y-4 sm:space-y-5">
+            
+            {/* Full Name */}
             <div className="space-y-1">
-              <label className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase ml-1">Full Name</label>
+              <label className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase ml-1">Full Name / نام کامل</label>
               <div className="relative">
                 <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 <input 
@@ -66,6 +84,46 @@ export default function SignupPage() {
               </div>
             </div>
 
+            {/* WhatsApp Phone Number */}
+            <div className="space-y-1">
+              <label className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase ml-1">WhatsApp Number / شماره واتساپ</label>
+              <div className="relative">
+                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <input 
+                  type="tel" required placeholder="+44 7476 620282"
+                  className="w-full pl-12 pr-4 py-3.5 sm:py-4 bg-slate-50 border border-slate-100 rounded-2xl text-slate-900 focus:border-emerald-500 focus:bg-white outline-none transition-all text-sm sm:text-base"
+                  onChange={(e) => setPhone(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Country */}
+            <div className="space-y-1">
+              <label className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase ml-1">Country / کشور</label>
+              <div className="relative">
+                <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <input 
+                  type="text" required placeholder="United Kingdom"
+                  className="w-full pl-12 pr-4 py-3.5 sm:py-4 bg-slate-50 border border-slate-100 rounded-2xl text-slate-900 focus:border-emerald-500 focus:bg-white outline-none transition-all text-sm sm:text-base"
+                  onChange={(e) => setCountry(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Date of Birth */}
+            <div className="space-y-1">
+              <label className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase ml-1">Date of Birth / تاریخ تولد</label>
+              <div className="relative">
+                <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <input 
+                  type="date" required
+                  className="w-full pl-12 pr-4 py-3.5 sm:py-4 bg-slate-50 border border-slate-100 rounded-2xl text-slate-900 focus:border-emerald-500 focus:bg-white outline-none transition-all text-sm sm:text-base"
+                  onChange={(e) => setDob(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Email Address */}
             <div className="space-y-1">
               <label className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase ml-1">Email Address</label>
               <div className="relative">
@@ -78,6 +136,7 @@ export default function SignupPage() {
               </div>
             </div>
 
+            {/* Password */}
             <div className="space-y-1">
               <label className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase ml-1">Password</label>
               <div className="relative">

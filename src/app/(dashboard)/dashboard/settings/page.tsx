@@ -14,7 +14,7 @@ export default function SettingsPage() {
   const [profile, setProfile] = useState({
     first_name: '',
     last_name: '',
-    dob: '',
+    date_of_birth: '', // اصلاح نام متغیر متناسب با دیتابیس
     country: '',
     phone: ''
   });
@@ -24,17 +24,22 @@ export default function SettingsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUser(user);
-        const { data } = await supabase
+        // فراخوانی دقیق فیلدها از جدول profiles
+        const { data, error } = await supabase
           .from('profiles')
-          .select('first_name, last_name, dob, country, phone')
+          .select('first_name, last_name, date_of_birth, country, phone')
           .eq('id', user.id)
           .single();
         
+        if (error) {
+          console.error("Error fetching profile:", error.message);
+        }
+
         if (data) {
           setProfile({
             first_name: data.first_name || '',
             last_name: data.last_name || '',
-            dob: data.dob || '',
+            date_of_birth: data.date_of_birth || '', // خواندن مستقیم از دیتابیس
             country: data.country || '',
             phone: data.phone || ''
           });
@@ -52,7 +57,7 @@ export default function SettingsPage() {
       .update({
         first_name: profile.first_name,
         last_name: profile.last_name,
-        dob: profile.dob,
+        date_of_birth: profile.date_of_birth, // آپدیت فیلد تاریخ تولد اصلی
         country: profile.country,
         phone: profile.phone,
       })
@@ -130,8 +135,8 @@ export default function SettingsPage() {
               <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input 
                 type="date" 
-                value={profile.dob}
-                onChange={(e) => setProfile({...profile, dob: e.target.value})}
+                value={profile.date_of_birth}
+                onChange={(e) => setProfile({...profile, date_of_birth: e.target.value})}
                 className="w-full pl-12 pr-4 py-4 bg-slate-50 rounded-2xl border border-slate-100 outline-none focus:border-emerald-500 focus:bg-white transition-all font-bold text-slate-700"
               />
             </div>
@@ -139,7 +144,7 @@ export default function SettingsPage() {
 
           {/* شماره تماس */}
           <div className="space-y-2">
-            <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Phone Number</label>
+            <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">WhatsApp Number</label>
             <div className="relative">
               <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input 
@@ -170,7 +175,7 @@ export default function SettingsPage() {
           {/* ایمیل (غیرقابل تغییر) */}
           <div className="space-y-2 md:col-span-2">
             <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Email Address (Primary)</label>
-            <input type="email" disabled value={user?.email} className="w-full p-4 bg-slate-100 rounded-2xl border border-slate-100 text-slate-400 cursor-not-allowed font-medium" />
+            <input type="email" disabled value={user?.email || ''} className="w-full p-4 bg-slate-100 rounded-2xl border border-slate-100 text-slate-400 cursor-not-allowed font-medium" />
           </div>
         </div>
 

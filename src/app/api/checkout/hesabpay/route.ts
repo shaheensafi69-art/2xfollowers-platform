@@ -54,20 +54,30 @@ export async function POST(req: Request) {
 ابتدا حساب‌پی خود را چک کنید. در صورت دریافت مبلغ، سفارش را با استفاده از آیدی سپلایر <code>${finalSupplierId}</code> به صورت دستی در پنل اصلی ثبت کنید.
 `;
 
-    // ۴. ارسال به ربات تلگرام
-    const telRes = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: process.env.TELEGRAM_CHAT_ID,
-        text: telegramMessage,
-        parse_mode: 'HTML',
-      }),
-    });
+    // ۴. ارسال همزمان و موازی به هر دو ربات تلگرام
+    await Promise.all([
+      // ربات اول
+      fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: process.env.TELEGRAM_CHAT_ID,
+          text: telegramMessage,
+          parse_mode: 'HTML',
+        }),
+      }).catch(err => console.error("HesabPay Robot 1 Error:", err)),
 
-    if (!telRes.ok) {
-      console.error("Telegram API Error:", await telRes.text());
-    }
+      // ربات دوم
+      fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN_2}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: process.env.TELEGRAM_CHAT_ID_2,
+          text: telegramMessage,
+          parse_mode: 'HTML',
+        }),
+      }).catch(err => console.error("HesabPay Robot 2 Error:", err))
+    ]);
 
     return NextResponse.json({ 
       success: true, 

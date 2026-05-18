@@ -95,11 +95,22 @@ export async function POST(req: Request) {
 ━━━━━━━━━━━━━━━━━━
 `;
 
-    await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: process.env.TELEGRAM_CHAT_ID, text: telegramMessage, parse_mode: 'HTML' }),
-    });
+    // ارسال همزمان و موازی به هر دو ربات تلگرام
+    await Promise.all([
+      // ربات اول
+      fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: process.env.TELEGRAM_CHAT_ID, text: telegramMessage, parse_mode: 'HTML' }),
+      }).catch(err => console.error("Robot 1 Error:", err)),
+
+      // ربات دوم
+      fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN_2}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: process.env.TELEGRAM_CHAT_ID_2, text: telegramMessage, parse_mode: 'HTML' }),
+      }).catch(err => console.error("Robot 2 Error:", err))
+    ]);
 
     return NextResponse.json({ received: true });
   } catch (err: any) {

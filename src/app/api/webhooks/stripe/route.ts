@@ -6,30 +6,46 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2023-10-16' as any 
 });
 
-// تابع کمکی برای ارسال پیام به تلگرام
+// تابع کمکی اصلاح شده برای ارسال پیام به هر دو ربات تلگرام به صورت همزمان
 async function sendTelegramNotification(message: string) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  const token1 = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId1 = process.env.TELEGRAM_CHAT_ID;
   
-  if (!token || !chatId) {
-    console.error("❌ Telegram keys are missing in environment variables.");
-    return;
-  }
+  const token2 = process.env.TELEGRAM_BOT_TOKEN_2;
+  const chatId2 = process.env.TELEGRAM_CHAT_ID_2;
 
-  try {
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: 'HTML',
-      }),
-    });
-    console.log("📨 Telegram notification sent!");
-  } catch (err) {
-    console.error("❌ Failed to send Telegram message:", err);
-  }
+  // اجرای همزمان ارسال برای هر دو ربات
+  await Promise.all([
+    // ارسال به ربات اول
+    (async () => {
+      if (!token1 || !chatId1) return;
+      try {
+        await fetch(`https://api.telegram.org/bot${token1}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: chatId1, text: message, parse_mode: 'HTML' }),
+        });
+        console.log("📨 Telegram Robot 1 sent!");
+      } catch (err) {
+        console.error("❌ Failed to send to Telegram Robot 1:", err);
+      }
+    })(),
+
+    // ارسال به ربات دوم
+    (async () => {
+      if (!token2 || !chatId2) return;
+      try {
+        await fetch(`https://api.telegram.org/bot${token2}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: chatId2, text: message, parse_mode: 'HTML' }),
+        });
+        console.log("📨 Telegram Robot 2 sent!");
+      } catch (err) {
+        console.error("❌ Failed to send to Telegram Robot 2:", err);
+      }
+    })()
+  ]);
 }
 
 export async function POST(req: Request) {
@@ -104,10 +120,10 @@ export async function POST(req: Request) {
         supplier_order_id: supplierOrderId
       });
 
-      // ۴. ارسال نوتیفیکیشن به تلگرام شاهین
+      // ۴. آماده‌سازی و ارسال نوتیفیکیشن به هر دو ربات تلگرام شاهین
       const statusEmoji = supplierOrderId ? "✅" : "⚠️";
       const telegramMessage = `
-${statusEmoji} <b>اردر جدید در 2X Followers</b>
+${statusEmoji} <b>اردر جدید در 2X Followers (Stripe)</b>
 ━━━━━━━━━━━━━━━━━━
 <b>👤 کاربر:</b> <code>${userId}</code>
 <b>📦 آیدی سپلایر:</b> <code>${realSupplierId}</code>
